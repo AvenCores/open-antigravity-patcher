@@ -1,1 +1,5 @@
 .env/
+main.dist/
+main.onefile-build/
+main.build/
+main.exe
