@@ -1,1 +1,1 @@
-nuitka --onefile main.py
+nuitka --onefile --windows-icon-from-ico=icon.ico --windows-uac-admin main.py
