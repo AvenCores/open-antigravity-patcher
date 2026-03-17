@@ -291,12 +291,23 @@ def format_size_mb(path):
     size_mb = file_size(path) / 1024 / 1024
     return f"{size_mb:.1f} MB"
 
+def print_target_info(main_js_path, show_search_line=False):
+    if show_search_line:
+        print("  [*] Searching for Antigravity installation...")
+    print(f"  [*] Target: {color(main_js_path, COLOR_CYAN)}")
+    ver_str = get_ag_version(main_js_path)
+    if ver_str:
+        print(f"  [*] Antigravity version: {color(ver_str, COLOR_GREEN)}")
+    else:
+        print(color("  [!] Antigravity version: not detected", COLOR_YELLOW))
+    print(f"  [*] Size:   {color(format_size_mb(main_js_path), COLOR_GREEN)}")
+
 def prompt_yn(question):
     question = question.rstrip()
     prompt = f"  [?] {question} ({color('y', COLOR_GREEN)}/{color('n', COLOR_RED)}): "
     return input(prompt).strip().lower()
 
-def do_patch(main_js_path):
+def do_patch(main_js_path, show_search_line=False):
     # --- Проверка минимальной версии ---
     ver_ok, ver_str = check_ag_version(main_js_path)
 
@@ -336,6 +347,9 @@ def do_patch(main_js_path):
         print("  [i] File appears already patched.")
         c = prompt_yn("Apply anyway?")
         if c != 'y':
+            clear_screen()
+            print_banner()
+            print_target_info(main_js_path, show_search_line=show_search_line)
             return
 
     backup_path = main_js_path + ".bak"
@@ -387,7 +401,7 @@ def do_patch(main_js_path):
     print()
     print("  Restart Antigravity and sign in.")
 
-def do_restore(main_js_path):
+def do_restore(main_js_path, show_search_line=False):
     backup_path = main_js_path + ".bak"
     try:
         with open(backup_path, "r", encoding="utf-8") as f:
@@ -400,10 +414,11 @@ def do_restore(main_js_path):
         with open(main_js_path, "w", encoding="utf-8") as f:
             f.write(data)
     except Exception as e:
-        print(f"  [!] Restore error: {e}")
+        print(f"\n  [!] Restore error: {e}")
         return
 
-    print("  [+] Restored from backup!")
+    print_target_info(main_js_path, show_search_line=show_search_line)
+    print("\n  [+] Restored from backup!")
 
 def main():
     setup_console()
@@ -427,8 +442,10 @@ def main():
             main_js_path = local
             print("  [*] Found main.js in current directory")
 
+    searched = False
     if not main_js_path:
         print("  [*] Searching for Antigravity installation...")
+        searched = True
         root = find_install_root()
         if root:
             main_js_path = find_main_js(root)
@@ -440,13 +457,7 @@ def main():
         input("\n  Press Enter to exit...")
         return
 
-    print(f"  [*] Target: {color(main_js_path, COLOR_CYAN)}")
-    ver_str = get_ag_version(main_js_path)
-    if ver_str:
-        print(f"  [*] Antigravity version: {color(ver_str, COLOR_GREEN)}")
-    else:
-        print(color("  [!] Antigravity version: not detected", COLOR_YELLOW))
-    print(f"  [*] Size:   {color(format_size_mb(main_js_path), COLOR_GREEN)}")
+    print_target_info(main_js_path, show_search_line=False)
     print()
 
     while True:
@@ -464,9 +475,9 @@ def main():
         print_banner()
 
         if choice == "1":
-            do_patch(main_js_path)
+            do_patch(main_js_path, show_search_line=searched)
         elif choice == "2":
-            do_restore(main_js_path)
+            do_restore(main_js_path, show_search_line=searched)
         else:
             print("  [!] Invalid choice")
         print()
