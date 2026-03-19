@@ -67,13 +67,15 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 
 ## 🌟 Возможности
 - Автоматический поиск установленного Antigravity в стандартных путях и реестре Windows.
+- Поддержка Linux: поиск по `/usr/share/antigravity`, определение версии через `dpkg`, `rpm` и `package.json`.
 - Создание резервной копии `main.js.bak` перед изменениями.
 - Применение и откат патча через простое меню.
 - Поддержка путей `resources/app/out/main.js` и `resources/app/main.js`.
-- Цветной вывод и попытка автоматического повышения прав (UAC).
+- Цветной вывод и попытка автоматического повышения прав (UAC на Windows, предложение `sudo` на Linux).
 - Проверка минимальной версии Antigravity (>= `1.20.5`) перед применением патча.
 - Отображение версии Antigravity, размера файла и SHA-256 хэша до/после патча.
-- Определение версии Antigravity через реестр Windows.
+- Определение версии Antigravity через реестр Windows или пакетный менеджер на Linux.
+- Обнаружение уже применённого патча с предложением применить повторно.
 
 ## 🚀 Как использовать
 1. Закройте Antigravity.
@@ -94,8 +96,13 @@ python main.py
 
 Запуск с указанием пути:
 ```bash
+# Windows
 python main.py "C:\\Program Files\\Antigravity"
 python main.py "C:\\Program Files\\Antigravity\\resources\\app\\out\\main.js"
+
+# Linux
+python main.py /usr/share/antigravity
+python main.py /usr/share/antigravity/resources/app/out/main.js
 ```
 
 Если `main.js` находится рядом со скриптом, путь указывать не нужно — он будет найден автоматически.
@@ -105,16 +112,16 @@ python main.py "C:\\Program Files\\Antigravity\\resources\\app\\out\\main.js"
 Патчер вносит **4 правки** в `main.js`. Все изменения обратимы через резервную копию (`main.js.bak`).
 
 ### 1. `if(isGoogleInternal)` → `if(true)`
-Заменяет проверку флага `isGoogleInternal` на безусловное `true`, снимая региональные/внутренние ограничения. Применяется ко всем вхождениям в файле.
+Заменяет проверку флага `isGoogleInternal` на безусловное `true`, снимая региональные/внутренние ограничения. Применяется ко всем вхождениям в файле (паттерн `if(this.<svc>.isGoogleInternal)`).
 
 ### 2. Внедрение `onboardUser`
-После вызова `loadCodeAssist` добавляется вызов `onboardUser`, обеспечивающий корректное прохождение онбординга. Сначала пытается активировать тир `"standard-tier"`, при ошибке — `"free-tier"`. Если основной путь не найден, используется fallback-вариант (вставка сразу после `loadCodeAssist`).
+После вызова `loadCodeAssist` добавляется вызов `onboardUser`, обеспечивающий корректное прохождение онбординга. Сначала пытается активировать тир `"standard-tier"`, при ошибке — `"free-tier"`. Если основной путь (перед `const{settings...}`) не найден, используется fallback-вариант (вставка сразу после `loadCodeAssist`).
 
 ### 3. `ideName` → `"antigravity-insiders"`
 Заменяет `ideName:"antigravity"` на `ideName:"antigravity-insiders"` для корректной идентификации клиента.
 
 ### 4. `refreshUserStatus` — обёртка с fallback
-Оборачивает все вызовы `refreshUserStatus` в `try/catch`. При ошибке возвращает безопасный объект-заглушку со значениями `userTier: "pro"` и пустыми `settings`, предотвращая падение приложения при недоступности статуса пользователя.
+Оборачивает все вызовы `refreshUserStatus` в анонимную async-функцию с `try/catch`. При ошибке возвращает безопасный объект-заглушку со значениями `userTier: "pro"`, пустым `settings: {}` и оригинальным `oauthTokenInfo`, предотвращая падение приложения при недоступности статуса пользователя.
 
 ## 🔍 Логика поиска файла
 
@@ -122,21 +129,49 @@ python main.py "C:\\Program Files\\Antigravity\\resources\\app\\out\\main.js"
 
 1. Аргумент командной строки (путь к директории или напрямую к `main.js`).
 2. Текущая директория (`./main.js`).
-3. Автоматический поиск по стандартным путям Windows:
-   - `%LOCALAPPDATA%\Programs\Antigravity`
-   - `%PROGRAMFILES%\Antigravity`
-   - `%PROGRAMFILES(X86)%\Antigravity`
-4. Реестр Windows (`HKCU` и `HKLM`: `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Antigravity`).
+3. Автоматический поиск по стандартным путям:
+   - **Windows:**
+     - `%LOCALAPPDATA%\Programs\Antigravity`
+     - `%PROGRAMFILES%\Antigravity`
+     - `%PROGRAMFILES(X86)%\Antigravity`
+   - **Linux:**
+     - `/usr/share/antigravity`
+4. Реестр Windows (ключ `{AA73B3E3-C6C8-45C8-B1DC-4AE56C751432}_is1` в `HKCU` и `HKLM`: `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\`).
 
 Внутри найденной директории проверяются пути:
 - `resources/app/out/main.js`
 - `resources/app/main.js`
+- `main.js` (если путь указан напрямую)
+
+## 🔎 Определение версии Antigravity
+
+| Платформа | Метод определения версии |
+|---|---|
+| **Windows** | Реестр: `DisplayVersion` из ключа `{AA73B3E3-...}_is1` |
+| **Linux (deb)** | `dpkg-query -W antigravity` |
+| **Linux (rpm)** | `rpm -q --queryformat %{VERSION} antigravity` |
+| **Linux (portable/snap/flatpak)** | `package.json` рядом с `main.js` |
+
+Если версия не определена, патчер предлагает продолжить без проверки. Если версия ниже `1.20.5` — предупреждает и также предлагает выбор.
+
+## 🔒 Проверка уже применённого патча
+
+Перед патчингом скрипт проверяет, не был ли файл уже пропатчен, по двум признакам:
+- наличие `if(true)` в файле
+- наличие строки `"antigravity-insiders"`
+
+Если оба признака найдены, выдаётся предупреждение с запросом подтверждения повторного применения.
+
+## 🛡️ Повышение прав
+
+- **Windows**: автоматический UAC-запрос через `ShellExecuteW` с параметром `runas`. Корректно обрабатывает пути с пробелами.
+- **Linux**: если скрипт запущен не от root, предлагает перезапуститься через `sudo` (`os.execvp`). При отказе продолжает с предупреждением о возможных ошибках записи.
 
 ## ⚙️ Требования
 
 - **Python** 3.x
 - **Зависимости**: `packaging` (для сравнения версий)
-- **ОС**: Windows (для автопоиска через реестр и UAC). На Linux/macOS работает при ручном указании пути.
+- **ОС**: Windows (полная поддержка автопоиска через реестр и UAC) или Linux (автопоиск в `/usr/share/antigravity`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение). На macOS работает при ручном указании пути.
 - **Минимальная версия Antigravity**: `1.20.5`
 
 ## 🛠️ Сборка
