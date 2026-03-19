@@ -68,6 +68,8 @@ def print_banner():
 
 def is_admin():
     try:
+        if os.name == 'posix':
+            return os.getuid() == 0
         return ctypes.windll.shell32.IsUserAnAdmin()
     except Exception:
         return False
@@ -95,6 +97,9 @@ def run_as_admin():
 
 def find_install_root():
     candidates =[]
+
+    if os.name == 'posix':
+        candidates.append("/usr/share/antigravity")
 
     if os.name == 'nt':
         local_app_data = os.environ.get("LOCALAPPDATA")
@@ -145,8 +150,27 @@ def find_main_js(root):
 
 def get_ag_version(main_js_path):
     """
-    Читает версию Antigravity только из реестра Windows.
+    Читает версию Antigravity из реестра Windows или package.json на Linux.
     """
+    if os.name == 'posix':
+        # Ищем package.json рядом с main.js или на уровень выше
+        for rel in (
+            os.path.join(os.path.dirname(main_js_path), "..", "package.json"),
+            os.path.join(os.path.dirname(main_js_path), "package.json"),
+        ):
+            pkg = os.path.normpath(rel)
+            if os.path.exists(pkg):
+                try:
+                    import json
+                    with open(pkg, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    ver = data.get("version", "").strip()
+                    if ver:
+                        return ver
+                except Exception:
+                    pass
+        return None
+
     if os.name == 'nt':
         try:
             import winreg
@@ -460,7 +484,10 @@ def main():
     if not main_js_path:
         print("  [!] main.js not found!")
         print("  [i] Put main.js next to ag_patcher.py, or specify path:")
-        print("      python ag_patcher.py C:\\path\\to\\Antigravity")
+        if os.name == 'nt':
+            print("      python ag_patcher.py C:\\path\\to\\Antigravity")
+        else:
+            print("      python ag_patcher.py /usr/share/antigravity")
         input("\n  Press Enter to exit...")
         return
 
