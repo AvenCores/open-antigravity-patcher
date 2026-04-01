@@ -11,7 +11,7 @@ import subprocess
 from enum import Enum
 from packaging.version import Version
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 MIN_AG_VERSION = "1.20.5"
 USE_COLOR = False
 
@@ -494,6 +494,21 @@ def is_already_patched(content):
     return 'ideName:"antigravity-insiders"' in content and "onboardUser(" in content
 
 
+def backup_matches_current_main_js(backup_content, current_content):
+    """Проверяет, соответствует ли backup текущему main.js."""
+    if current_content is None:
+        return False
+
+    if backup_content == current_content:
+        return True
+
+    if is_already_patched(current_content) and not is_already_patched(backup_content):
+        patched_backup_content, _ = apply_patches(backup_content)
+        return patched_backup_content == current_content
+
+    return False
+
+
 # ---------------------------------------------------------------------------
 # UI-утилиты
 # ---------------------------------------------------------------------------
@@ -568,7 +583,7 @@ def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_c
         )
 
     if current_content is not None:
-        if backup_content == current_content:
+        if backup_matches_current_main_js(backup_content, current_content):
             if installed_version_str and not backup_version_str:
                 save_backup_version(backup_path, installed_version_str)
         elif not is_already_patched(current_content):
@@ -618,7 +633,9 @@ def do_patch(main_js_path, show_search_line=False):
         print(f"  [!] Read error: {e}")
         return
 
-    if is_already_patched(content):
+    current_is_patched = is_already_patched(content)
+
+    if current_is_patched:
         print("  [i] File appears already patched.")
         if not confirmed("Apply anyway?"):
             clear_screen()
@@ -631,6 +648,9 @@ def do_patch(main_js_path, show_search_line=False):
     need_new_backup = True
     if os.path.exists(backup_path):
         backup_size = file_size(backup_path)
+        backup_version_str = load_backup_version(backup_path)
+        backup_version = parse_version_safe(backup_version_str)
+        installed_version = parse_version_safe(ver_str)
         try:
             with open(backup_path, "r", encoding="utf-8") as f:
                 backup_content = f.read()
@@ -638,7 +658,21 @@ def do_patch(main_js_path, show_search_line=False):
         except Exception:
             backup_looks_empty = True
 
-        if backup_looks_empty:
+        if backup_looks_empty and current_is_patched:
+            print(color("  [!] Existing backup looks empty or corrupted, but current main.js is already patched - keeping it because a clean backup cannot be rebuilt now.", COLOR_YELLOW))
+            need_new_backup = False
+        elif is_already_patched(backup_content) and current_is_patched:
+            print(color("  [!] Existing backup is itself patched, but current main.js is already patched too - keeping it because a clean backup cannot be rebuilt now.", COLOR_YELLOW))
+            need_new_backup = False
+        elif not current_is_patched and backup_content != content:
+            if installed_version and backup_version and backup_version < installed_version:
+                print(color(f"  [!] Existing backup is from older version {backup_version_str} - replacing it.", COLOR_YELLOW))
+            else:
+                print(color("  [!] Existing backup does not match the current clean main.js - replacing it.", COLOR_YELLOW))
+        elif current_is_patched and not backup_matches_current_main_js(backup_content, content):
+            print(color("  [!] Existing backup does not match the current patched build - keeping it because a clean backup cannot be rebuilt now.", COLOR_YELLOW))
+            need_new_backup = False
+        elif backup_looks_empty:
             print(color("  [!] Existing backup looks empty or corrupted — replacing it.", COLOR_YELLOW))
         elif is_already_patched(backup_content):
             print(color("  [!] Existing backup is itself patched — replacing it with clean copy.", COLOR_YELLOW))
@@ -647,16 +681,19 @@ def do_patch(main_js_path, show_search_line=False):
             print("  [i] Backup already exists")
 
     if need_new_backup:
-        print("  [*] Creating backup...")
-        try:
-            with open(backup_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            save_backup_version(backup_path, ver_str)
-            save_backup_hash(backup_path)
-            print(f"  [+] Backup: {os.path.basename(backup_path)}")
-        except Exception as e:
-            print(f"  [!] Backup error: {e}")
-            return
+        if current_is_patched:
+            print(color("  [!] main.js is already patched - skipping backup creation because a clean backup cannot be created from a patched file.", COLOR_YELLOW))
+        else:
+            print("  [*] Creating backup...")
+            try:
+                with open(backup_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                save_backup_version(backup_path, ver_str)
+                save_backup_hash(backup_path)
+                print(f"  [+] Backup: {os.path.basename(backup_path)}")
+            except Exception as e:
+                print(f"  [!] Backup error: {e}")
+                return
 
     hash_before = file_hash(main_js_path)
 
