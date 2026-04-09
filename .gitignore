@@ -4,3 +4,5 @@ build/
 Open AG Patcher.spec
 Open_AG_Patcher_Windows.spec
 Open_AG_Patcher_Linux.spec
+__pycache__
+main.js
