@@ -14,12 +14,12 @@
 </div>
 
 # 🔑 Open AG Patcher
-[![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://github.com/AvenCores/open-antigravity-unlock)
+[![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://github.com/AvenCores/open-antigravity-patcher)
 [![GPL-3.0 License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](./LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/AvenCores/open-antigravity-unlock?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-unlock/stargazers)
-![GitHub forks](https://img.shields.io/github/forks/AvenCores/open-antigravity-unlock?style=for-the-badge)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/AvenCores/open-antigravity-unlock?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-unlock/pulls)
-[![GitHub issues](https://img.shields.io/github/issues/AvenCores/open-antigravity-unlock?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-unlock/issues)
+[![GitHub stars](https://img.shields.io/github/stars/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/stargazers)
+![GitHub forks](https://img.shields.io/github/forks/AvenCores/open-antigravity-patcher?style=for-the-badge)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/pulls)
+[![GitHub issues](https://img.shields.io/github/issues/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/issues)
 
 Опенсорс патчер для Antigravity: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
 
@@ -72,8 +72,7 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 - Применение и откат патча через простое меню.
 - Поддержка путей `resources/app/out/main.js` и `resources/app/main.js`.
 - Цветной вывод и попытка автоматического повышения прав (UAC на Windows, предложение `sudo` на Linux).
-- Проверка минимальной версии Antigravity (>= `1.20.5`) перед применением патча.
-- Отображение версии Antigravity, размера файла и SHA-256 хэша до/после патча.
+- Проверка минимальной версии Antigravity (>= `1.22.2`) перед применением патча.
 - Определение версии Antigravity через реестр Windows или пакетный менеджер на Linux.
 - Обнаружение уже применённого патча с предложением применить повторно.
 
@@ -114,14 +113,16 @@ python main.py /usr/share/antigravity/resources/app/out/main.js
 ### 1. `if(isGoogleInternal)` → `if(true)`
 Заменяет проверку флага `isGoogleInternal` на безусловное `true`, снимая региональные/внутренние ограничения. Применяется ко всем вхождениям в файле (паттерн `if(this.<svc>.isGoogleInternal)`).
 
-### 2. Внедрение `onboardUser`
-После вызова `loadCodeAssist` добавляется вызов `onboardUser`, обеспечивающий корректное прохождение онбординга. Сначала пытается активировать тир `"standard-tier"`, при ошибке — `"free-tier"`. Если основной путь (перед `const{settings...}`) не найден, используется fallback-вариант (вставка сразу после `loadCodeAssist`).
+### 2. `if(X(),this.Y.isGoogleInternal)` → `if(X(),true)` (auth service)
+В v1.22+ auth service проверяет `if(this.w.resetIsTierGCPTos(),this.t.isGoogleInternal)`. Этот патч заменяет проверку на `true`, обеспечивая обход проверки в сервисе авторизации.
 
 ### 3. `ideName` → `"antigravity-insiders"`
 Заменяет `ideName:"antigravity"` на `ideName:"antigravity-insiders"` для корректной идентификации клиента.
 
-### 4. `refreshUserStatus` — обёртка с fallback
-Оборачивает все вызовы `refreshUserStatus` в анонимную async-функцию с `try/catch`. При ошибке возвращает безопасный объект-заглушку со значениями `userTier: "pro"`, пустым `settings: {}` и оригинальным `oauthTokenInfo`, предотвращая падение приложения при недоступности статуса пользователя.
+### 4. Экран `ineligible` — обход (v1.22+)
+Заменяет spread тернар `...s?{}:{errorType:"ineligible",reason:a,verificationUrl:i}` на `...s?{}:{}` — ошибка ineligible не отправляется, экран блокировки не показывается.
+
+> **Примечание:** Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.
 
 ## 🔍 Логика поиска файла
 
@@ -152,12 +153,12 @@ python main.py /usr/share/antigravity/resources/app/out/main.js
 | **Linux (rpm)** | `rpm -q --queryformat %{VERSION} antigravity` |
 | **Linux (portable/snap/flatpak)** | `package.json` рядом с `main.js` |
 
-Если версия не определена, патчер предлагает продолжить без проверки. Если версия ниже `1.20.5` — предупреждает и также предлагает выбор.
+Если версия не определена, патчер предлагает продолжить без проверки. Если версия ниже `1.22.2` — предупреждает и также предлагает выбор.
 
 ## 🔒 Проверка уже применённого патча
 
 Перед патчингом скрипт проверяет, не был ли файл уже пропатчен, по двум признакам:
-- наличие `if(true)` в файле
+- отсутствие `if(this.X.isGoogleInternal)` (паттерн заменён на `if(true)`)
 - наличие строки `"antigravity-insiders"`
 
 Если оба признака найдены, выдаётся предупреждение с запросом подтверждения повторного применения.
@@ -172,7 +173,7 @@ python main.py /usr/share/antigravity/resources/app/out/main.js
 - **Python** 3.x
 - **Зависимости**: `packaging` (для сравнения версий)
 - **ОС**: Windows (полная поддержка автопоиска через реестр и UAC) или Linux (автопоиск в `/usr/share/antigravity`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение). На macOS работает при ручном указании пути.
-- **Минимальная версия Antigravity**: `1.20.5`
+- **Минимальная версия Antigravity**: `1.22.2`
 
 ## 🛠️ Сборка
 Требуется `pyinstaller`:
