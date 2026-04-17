@@ -339,6 +339,62 @@ def file_size(path):
         return 0
 
 
+def find_app_bundle(path):
+    """Поднимается вверх от path до первой директории, оканчивающейся на .app.
+
+    Используется только на macOS, чтобы определить корень .app-бандла
+    для переподписи после модификации main.js.
+    """
+    p = os.path.abspath(path)
+    while p and p != os.path.dirname(p):
+        if p.endswith(".app"):
+            return p
+        p = os.path.dirname(p)
+    return ""
+
+
+def resign_macos_bundle(main_js_path):
+    """Переподписывает .app ad-hoc подписью после изменения main.js.
+
+    На macOS любая модификация файла внутри подписанного .app-бандла
+    нарушает code signature. Electron-приложения с Hardened Runtime
+    после этого падают при запуске. codesign --force --sign - кладёт
+    ad-hoc подпись (без Developer ID), чего достаточно для локального
+    запуска. Дополнительно снимается атрибут com.apple.quarantine,
+    чтобы Gatekeeper не показывал предупреждение.
+    """
+    if sys.platform != "darwin":
+        return
+
+    app_path = find_app_bundle(main_js_path)
+    if not app_path:
+        # main.js лежит не внутри .app (например, portable-копия) — пропускаем
+        return
+
+    print(f"  [*] Re-signing {os.path.basename(app_path)} (ad-hoc)...")
+    try:
+        subprocess.run(
+            ["codesign", "--force", "--deep", "--sign", "-", app_path],
+            check=True, capture_output=True, text=True,
+        )
+        print(color("  [+] Ad-hoc signature applied", COLOR_GREEN))
+    except FileNotFoundError:
+        print(color("  [!] codesign not found — install Xcode Command Line Tools", COLOR_YELLOW))
+        return
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip()
+        print(color(f"  [!] codesign failed: {stderr}", COLOR_YELLOW))
+        return
+
+    try:
+        subprocess.run(
+            ["xattr", "-dr", "com.apple.quarantine", app_path],
+            check=False, capture_output=True,
+        )
+    except FileNotFoundError:
+        pass
+
+
 def format_bytes(size_bytes):
     if size_bytes >= 1024 * 1024:
         return f"{size_bytes / 1024 / 1024:.1f} MB"
@@ -655,6 +711,7 @@ def do_patch(main_js_path, show_search_line=False):
         return
 
     hash_after = file_hash(main_js_path)
+    resign_macos_bundle(main_js_path)
     print(f"  [+] Patches: {applied}/{len(results)} applied")
     if hash_before and hash_after:
         print(f"  [+] Before:  {hash_before[:8]}...{hash_before[56:]}")
@@ -729,6 +786,7 @@ def do_restore(main_js_path, show_search_line=False):
         return
 
     hash_after = file_hash(main_js_path)
+    resign_macos_bundle(main_js_path)
 
     # Удаляем мета-файлы бэкапа — после восстановления они уже неактуальны
     for ext in (".version", ".sha256"):
