@@ -154,7 +154,15 @@ def run_as_admin():
 def find_install_root():
     candidates = []
 
-    if os.name == "posix":
+    if sys.platform == "darwin":
+        # На macOS приложение — .app-бандл, main.js лежит внутри Contents/Resources/app
+        mac_candidates = [
+            "/Applications/Antigravity.app",
+            os.path.expanduser("~/Applications/Antigravity.app"),
+        ]
+        for app in mac_candidates:
+            candidates.append(os.path.join(app, "Contents", "Resources", "app"))
+    elif os.name == "posix":
         candidates.append("/usr/share/antigravity")
 
     if os.name == "nt":
@@ -185,6 +193,8 @@ def find_install_root():
         for sub in [
             os.path.join("resources", "app", "out", "main.js"),
             os.path.join("resources", "app", "main.js"),
+            os.path.join("out", "main.js"),
+            "main.js",
         ]:
             if os.path.exists(os.path.join(path, sub)):
                 return path
@@ -192,9 +202,14 @@ def find_install_root():
 
 
 def find_main_js(root):
+    # macOS: пользователь может передать путь к .app-бандлу напрямую
+    if sys.platform == "darwin" and root.endswith(".app") and os.path.isdir(root):
+        root = os.path.join(root, "Contents", "Resources", "app")
+
     for sub in [
         os.path.join("resources", "app", "out", "main.js"),
         os.path.join("resources", "app", "main.js"),
+        os.path.join("out", "main.js"),
         "main.js",
     ]:
         p = os.path.join(root, sub)
