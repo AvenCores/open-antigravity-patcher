@@ -64,12 +64,13 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 ## 🌟 Возможности
 - Автоматический поиск установленного Antigravity в стандартных путях и реестре Windows.
 - Поддержка Linux: поиск по `/usr/share/antigravity`, определение версии через `dpkg`, `rpm` и `package.json`.
+- Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js`.
 - Создание резервной копии `main.js.bak` перед изменениями.
 - Применение и откат патча через простое меню.
 - Поддержка путей `resources/app/out/main.js` и `resources/app/main.js`.
 - Цветной вывод и попытка автоматического повышения прав (UAC на Windows, предложение `sudo` на Linux).
 - Проверка минимальной версии Antigravity (>= `1.22.2`) перед применением патча.
-- Определение версии Antigravity через реестр Windows или пакетный менеджер на Linux.
+- Определение версии Antigravity через реестр Windows, пакетный менеджер на Linux или `package.json` на macOS.
 - Обнаружение уже применённого патча с предложением применить повторно.
 
 ## 🚀 Как использовать
@@ -98,9 +99,16 @@ python main.py "C:\\Program Files\\Antigravity\\resources\\app\\out\\main.js"
 # Linux
 python main.py /usr/share/antigravity
 python main.py /usr/share/antigravity/resources/app/out/main.js
+
+# macOS
+python3 main.py /Applications/Antigravity.app
+python3 main.py ~/Applications/Antigravity.app
+python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
 ```
 
 Если `main.js` находится рядом со скриптом, путь указывать не нужно — он будет найден автоматически.
+
+> **macOS:** если `Antigravity.app` лежит в `/Applications`, запись потребует `sudo` (скрипт сам предложит перезапуск). Для установки в `~/Applications` или пользовательскую директорию `sudo` не нужен. После успешного патча `.app` автоматически переподписывается ad-hoc подписью (`codesign --force --deep --sign -`) — без этого Electron с Hardened Runtime не запустится на macOS.
 
 ## ❓ Что именно меняется
 
@@ -133,12 +141,18 @@ python main.py /usr/share/antigravity/resources/app/out/main.js
      - `%PROGRAMFILES(X86)%\Antigravity`
    - **Linux:**
      - `/usr/share/antigravity`
+   - **macOS:**
+     - `/Applications/Antigravity.app/Contents/Resources/app`
+     - `~/Applications/Antigravity.app/Contents/Resources/app`
 4. Реестр Windows (ключ `{AA73B3E3-C6C8-45C8-B1DC-4AE56C751432}_is1` в `HKCU` и `HKLM`: `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\`).
 
 Внутри найденной директории проверяются пути:
 - `resources/app/out/main.js`
 - `resources/app/main.js`
+- `out/main.js` (macOS)
 - `main.js` (если путь указан напрямую)
+
+На macOS скрипт также принимает путь к `.app`-бандлу напрямую — `Contents/Resources/app/out/main.js` ресолвится автоматически.
 
 ## 🔎 Определение версии Antigravity
 
@@ -148,6 +162,7 @@ python main.py /usr/share/antigravity/resources/app/out/main.js
 | **Linux (deb)** | `dpkg-query -W antigravity` |
 | **Linux (rpm)** | `rpm -q --queryformat %{VERSION} antigravity` |
 | **Linux (portable/snap/flatpak)** | `package.json` рядом с `main.js` |
+| **macOS** | `package.json` в `Antigravity.app/Contents/Resources/app/` |
 
 Если версия не определена, патчер предлагает продолжить без проверки. Если версия ниже `1.22.2` — предупреждает и также предлагает выбор.
 
@@ -163,12 +178,42 @@ python main.py /usr/share/antigravity/resources/app/out/main.js
 
 - **Windows**: автоматический UAC-запрос через `ShellExecuteW` с параметром `runas`. Корректно обрабатывает пути с пробелами.
 - **Linux**: если скрипт запущен не от root, предлагает перезапуститься через `sudo` (`os.execvp`). При отказе продолжает с предупреждением о возможных ошибках записи.
+- **macOS**: использует ту же posix-ветку — `sudo` предлагается, если запущено без root. Для `~/Applications/Antigravity.app` на `sudo` можно ответить «n» (директория уже доступна на запись), для `/Applications/Antigravity.app` — согласиться.
+
+## 🍎 Особенности macOS
+
+### Переподпись `.app` после патча
+
+Любое изменение файла внутри подписанного `.app`-бандла нарушает code signature. Electron-приложения с включённым Hardened Runtime (Antigravity — одно из них) после этого **не запускаются** на macOS — до того, как Gatekeeper вообще покажет пользователю диалог.
+
+Чтобы `.app` продолжал работать, скрипт после `do_patch` и `do_restore` автоматически выполняет:
+
+```bash
+codesign --force --deep --sign - /path/to/Antigravity.app
+xattr -dr com.apple.quarantine /path/to/Antigravity.app
+```
+
+`--sign -` — ad-hoc подпись (без Developer ID). Этого достаточно для локального запуска приложения. Notarization не требуется.
+
+Требуется установленный `codesign` — он идёт в составе **Xcode Command Line Tools**:
+```bash
+xcode-select --install
+```
+
+### Если приложение не запускается после патча
+
+1. Убедись, что `codesign` доступен: `which codesign`.
+2. Проверь, что `.app` был переподписан: `codesign -dv /Applications/Antigravity.app 2>&1 | grep Authority` — должен быть `Signature=adhoc`.
+3. Если macOS всё равно блокирует: `Системные настройки → Конфиденциальность и безопасность` — внизу будет кнопка «Открыть всё равно».
 
 ## ⚙️ Требования
 
 - **Python** 3.x
 - **Зависимости**: `packaging` (для сравнения версий)
-- **ОС**: Windows (полная поддержка автопоиска через реестр и UAC) или Linux (автопоиск в `/usr/share/antigravity`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение). На macOS работает при ручном указании пути.
+- **ОС**:
+  - **Windows** — полная поддержка автопоиска через реестр и UAC.
+  - **Linux** — автопоиск в `/usr/share/antigravity`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
+  - **macOS** — автопоиск в `/Applications/Antigravity.app` и `~/Applications/Antigravity.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
 - **Минимальная версия Antigravity**: `1.22.2`
 
 ## 🛠️ Сборка
@@ -176,7 +221,8 @@ python main.py /usr/share/antigravity/resources/app/out/main.js
 ```bash
 pip install -r requirements.txt
 Windows: pyinstaller --onefile --uac-admin --icon=icon.ico --name="Open_AG_Patcher_Windows" main.py
-Linux: pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" main.py
+Linux:   pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" main.py
+macOS:   pyinstaller --onefile --name="Open_AG_Patcher_macOS" main.py
 ```
 
 ## Структура проекта
