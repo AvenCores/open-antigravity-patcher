@@ -118,7 +118,11 @@ python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
 Заменяет проверку флага `isGoogleInternal` на безусловное `true`, снимая региональные/внутренние ограничения. Применяется ко всем вхождениям в файле (паттерн `if(this.<svc>.isGoogleInternal)`).
 
 ### 2. `if(X(),this.Y.isGoogleInternal)` → `if(X(),true)` (auth service)
-В v1.22+ auth service проверяет `if(this.w.resetIsTierGCPTos(),this.t.isGoogleInternal)`. Этот патч заменяет проверку на `true`, обеспечивая обход проверки в сервисе авторизации.
+Аuth service проверяет различные паттерны в зависимости от версии:
+- **v1.22–v1.22.x:** `if(this.w.resetIsTierGCPTos(),this.t.isGoogleInternal)` → `if(this.w.resetIsTierGCPTos(),true)`
+- **v1.23+:** `if(this.t.send({...}),this.y.resetIsTierGCPTos(),this.w.isGoogleInternal)` → `if(this.t.send({...}),this.y.resetIsTierGCPTos(),true)`
+
+Патчер автоматически определяет версию Antigravity и применяет соответствующий паттерн для корректного обхода авторизации.
 
 ### 3. `ideName` → `"antigravity-insiders"`
 Заменяет `ideName:"antigravity"` на `ideName:"antigravity-insiders"` для корректной идентификации клиента.
@@ -126,7 +130,9 @@ python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
 ### 4. Экран `ineligible` — обход (v1.22+)
 Заменяет spread тернар `...s?{}:{errorType:"ineligible",reason:a,verificationUrl:i}` на `...s?{}:{}` — ошибка ineligible не отправляется, экран блокировки не показывается.
 
-> **Примечание:** Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.
+> **Примечание:** 
+> - Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.
+> - Начиная с v1.0.8 патчер использует **версионный выбор auth-паттерна**: для версий Antigravity < 1.23 применяется старый паттерн, для v1.23+ — новый с дополнительным вызовом `send()`.
 
 ## 🔍 Логика поиска файла
 
@@ -215,6 +221,7 @@ xcode-select --install
   - **Linux** — автопоиск в `/usr/share/antigravity`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
   - **macOS** — автопоиск в `/Applications/Antigravity.app` и `~/Applications/Antigravity.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
 - **Минимальная версия Antigravity**: `1.22.2`
+- **Поддерживаемые версии**: `1.22.2` и выше (с версионным выбором auth-паттерна для `1.23+`)
 
 ## 🛠️ Сборка
 Требуется `pyinstaller`:
