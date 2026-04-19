@@ -11,9 +11,10 @@ import subprocess
 from enum import Enum
 from packaging.version import Version
 
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 MIN_AG_VERSION = "1.22.2"
 USE_COLOR = False
+AUTH_PATCH_SWITCH_VERSION = Version("1.23")
 
 # Единственное место, где хранится GUID установщика Antigravity
 AG_REGISTRY_SUBKEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{AA73B3E3-C6C8-45C8-B1DC-4AE56C751432}_is1"
@@ -407,6 +408,22 @@ def format_bytes(size_bytes):
 # Патчи (каждый патч — отдельная функция)
 # ---------------------------------------------------------------------------
 
+RE_AUTH_IS_GOOGLE_INTERNAL = re.compile(
+    r'if\(\s*(?P<prefix>(?:this\.[A-Za-z_$][\w$]*\.send\(\{type:[^}]+\}\)\s*,\s*)?'
+    r'this\.[A-Za-z_$][\w$]*\.resetIsTierGCPTos\(\)\s*,\s*)'
+    r'this\.[A-Za-z_$][\w$]*\.isGoogleInternal\s*\)'
+)
+RE_AUTH_IS_GOOGLE_INTERNAL_OLD = re.compile(
+    r'if\(\s*(?P<prefix>this\.[A-Za-z_$][\w$]*\.resetIsTierGCPTos\(\)\s*,\s*)'
+    r'this\.[A-Za-z_$][\w$]*\.isGoogleInternal\s*\)'
+)
+RE_AUTH_IS_GOOGLE_INTERNAL_NEW = re.compile(
+    r'if\(\s*(?P<prefix>this\.[A-Za-z_$][\w$]*\.send\(\{type:[^}]+\}\)\s*,\s*'
+    r'this\.[A-Za-z_$][\w$]*\.resetIsTierGCPTos\(\)\s*,\s*)'
+    r'this\.[A-Za-z_$][\w$]*\.isGoogleInternal\s*\)'
+)
+
+
 def _patch_is_google_internal(content):
     """if(isGoogleInternal) → if(true) — forces internal Google path bypassing geo/eligibility checks."""
     re_if_internal = re.compile(r"if\(this\.([a-zA-Z_$]+)\.isGoogleInternal\)")
@@ -421,26 +438,37 @@ def _patch_is_google_internal(content):
     }
 
 
-def _patch_is_google_internal_comma(content):
-    """if(X(),this.Y.isGoogleInternal) → if(X(),true).
+def _patch_is_google_internal_comma(content, ag_version=None):
+    """if(...resetIsTierGCPTos(),this.Y.isGoogleInternal) → if(...resetIsTierGCPTos(),true).
 
-    В v1.22 auth service проверяет:
+    Версионный выбор auth-паттерна:
+    < 1.23:
     if(this.w.resetIsTierGCPTos(),this.t.isGoogleInternal){...}
+
+    >= 1.23:
+    if(this.t.send({type:t.isGcpTos?"GCP_SIGN_IN":"SIGN_IN"}),this.y.resetIsTierGCPTos(),this.w.isGoogleInternal){...}
     """
-    # Простой поиск конкретного паттерна из scan2 (#32)
-    old = 'if(this.w.resetIsTierGCPTos(),this.t.isGoogleInternal)'
-    new = 'if(this.w.resetIsTierGCPTos(),true)'
-    if old in content:
-        content = content.replace(old, new)
-        return content, {
-            "Name": "comma isGoogleInternal → true (auth)",
-            "Applied": True,
-            "Detail": "Replaced auth service isGoogleInternal check",
-        }
-    return content, {
+    if ag_version is not None and ag_version < AUTH_PATCH_SWITCH_VERSION:
+        auth_regex = RE_AUTH_IS_GOOGLE_INTERNAL_OLD
+        pattern_label = f"< {AUTH_PATCH_SWITCH_VERSION}"
+    elif ag_version is not None:
+        auth_regex = RE_AUTH_IS_GOOGLE_INTERNAL_NEW
+        pattern_label = f">= {AUTH_PATCH_SWITCH_VERSION}"
+    else:
+        auth_regex = RE_AUTH_IS_GOOGLE_INTERNAL
+        pattern_label = "auto"
+
+    matches = [m.group(0) for m in auth_regex.finditer(content)]
+    new_content = auth_regex.sub(r"if(\g<prefix>true)", content)
+    applied = new_content != content
+    return new_content, {
         "Name": "comma isGoogleInternal → true (auth)",
-        "Applied": False,
-        "Detail": "pattern not found",
+        "Applied": applied,
+        "Detail": (
+            f"replaced {len(matches)} auth occurrence(s) using {pattern_label} pattern"
+            if applied else
+            f"{pattern_label} pattern not found"
+        ),
     }
 
 
@@ -528,26 +556,23 @@ def apply_patches(content):
     return content, results
 
 
-def apply_patches_minimal(content):
-    """Для v1.22+: isGoogleInternal (оба паттерна) + ideName + ineligible."""
+def apply_patches_minimal(content, ag_version=None):
+    """Для v1.22+: version-aware auth patch + ideName + ineligible."""
     results = []
-    for patch_fn in (
-        _patch_is_google_internal,
-        _patch_is_google_internal_comma,
-        _patch_ide_name,
-        _patch_ineligible_screen,
-    ):
+    for patch_fn in (_patch_is_google_internal, _patch_ide_name, _patch_ineligible_screen):
         content, result = patch_fn(content)
         results.append(result)
+    content, result = _patch_is_google_internal_comma(content, ag_version=ag_version)
+    results.insert(1, result)
     return content, results
 
 
 def is_already_patched(content):
-    # Для v1.22: if(this.X.isGoogleInternal) убран + ideName пропатчен
-    import re
-    has_unpatched = bool(re.search(r'if\(this\.[a-zA-Z_$]+\.isGoogleInternal\)', content))
+    # Убраны прямой и auth-вариант isGoogleInternal, ideName пропатчен
+    has_unpatched_simple = bool(re.search(r'if\(this\.[a-zA-Z_$]+\.isGoogleInternal\)', content))
+    has_unpatched_auth = bool(RE_AUTH_IS_GOOGLE_INTERNAL.search(content))
     has_ide = 'ideName:"antigravity-insiders"' in content
-    return not has_unpatched and has_ide
+    return not has_unpatched_simple and not has_unpatched_auth and has_ide
 
 
 # ---------------------------------------------------------------------------
@@ -630,6 +655,7 @@ def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_c
 
 def do_patch(main_js_path, show_search_line=False):
     ver_status, ver_str = check_ag_version(main_js_path)
+    parsed_version = parse_version_safe(ver_str)
 
     if ver_status == VersionStatus.TOO_OLD:
         print(color(f"  [!] Unsupported version: {ver_str}", COLOR_RED))
@@ -686,9 +712,8 @@ def do_patch(main_js_path, show_search_line=False):
     print("  [*] Applying patches...")
     print()
 
-    # Для v1.22+ используем минимальный набор (isGoogleInternal + ideName)
-    # Полные патчи ломают поток авторизации
-    new_content, results = apply_patches_minimal(content)
+    # Для v1.22+ auth-патч выбирается по версии: <1.23 старый, >=1.23 новый.
+    new_content, results = apply_patches_minimal(content, ag_version=parsed_version)
 
     applied = 0
     for r in results:
