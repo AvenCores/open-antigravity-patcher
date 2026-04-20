@@ -227,7 +227,7 @@ xcode-select --install
 Требуется `pyinstaller`:
 ```bash
 pip install -r requirements.txt
-Windows: pyinstaller --onefile --uac-admin --icon=icon.ico --name="Open_AG_Patcher_Windows" main.py
+Windows: pyinstaller --onefile --uac-admin --noconsole --icon=icon.ico --name="Open_AG_Patcher_Windows" --noupx --clean --version-file=version.txt main.py
 Linux:   pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" main.py
 macOS:   pyinstaller --onefile --name="Open_AG_Patcher_macOS" main.py
 ```
