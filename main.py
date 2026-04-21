@@ -11,10 +11,19 @@ import subprocess
 from enum import Enum
 from packaging.version import Version
 
-VERSION = "1.0.8"
+VERSION = "1.0.9"
 MIN_AG_VERSION = "1.22.2"
 USE_COLOR = False
 AUTH_PATCH_SWITCH_VERSION = Version("1.23")
+RUNTIME_SETTINGS_SWITCH_VERSION = Version("1.23")
+CLOUD_CODE_ENDPOINT = "https://cloudcode-pa.googleapis.com"
+RUNTIME_EXPERIMENTS_TO_DISABLE = (
+    "CASCADE_DEFAULT_MODEL_OVERRIDE",
+    "CASCADE_USE_EXPERIMENT_CHECKPOINTER",
+    "CASCADE_NEW_MODELS_NUX",
+    "CASCADE_NEW_WAVE_2_MODELS_NUX",
+)
+RUNTIME_EXPERIMENTS_VALUE = ",".join(RUNTIME_EXPERIMENTS_TO_DISABLE)
 
 # Единственное место, где хранится GUID установщика Antigravity
 AG_REGISTRY_SUBKEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{AA73B3E3-C6C8-45C8-B1DC-4AE56C751432}_is1"
@@ -409,6 +418,139 @@ def format_bytes(size_bytes):
 
 
 # ---------------------------------------------------------------------------
+# Runtime settings workaround
+# ---------------------------------------------------------------------------
+
+def get_user_settings_path():
+    """Returns the Antigravity user settings.json path for the current OS."""
+    if os.name == "nt":
+        app_data = os.environ.get("APPDATA")
+        if app_data:
+            return os.path.join(app_data, "Antigravity", "User", "settings.json")
+        return ""
+
+    if sys.platform == "darwin":
+        return os.path.expanduser(
+            "~/Library/Application Support/Antigravity/User/settings.json"
+        )
+
+    if os.name == "posix":
+        config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+        return os.path.join(config_home, "Antigravity", "User", "settings.json")
+
+    return ""
+
+
+def backup_json_file(path):
+    if not os.path.exists(path):
+        return ""
+
+    base = f"{path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+    backup_path = base
+    counter = 1
+    while os.path.exists(backup_path):
+        counter += 1
+        backup_path = f"{base}-{counter}"
+
+    shutil.copy2(path, backup_path)
+    return backup_path
+
+
+def patch_runtime_settings(ag_version=None):
+    """Temporary workaround: pins the stable endpoint and disables known bad experiments."""
+    if ag_version is not None and ag_version < RUNTIME_SETTINGS_SWITCH_VERSION:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": f"skipped for Antigravity < {RUNTIME_SETTINGS_SWITCH_VERSION}",
+        }
+
+    settings_path = get_user_settings_path()
+    if not settings_path:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": "settings path not detected",
+        }
+
+    settings_dir = os.path.dirname(settings_path)
+    if not os.path.isdir(settings_dir):
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": f"user settings directory not found: {settings_dir}",
+        }
+
+    settings = {}
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                raw = f.read()
+            settings = json.loads(raw) if raw.strip() else {}
+        except Exception as e:
+            return {
+                "Name": "temporary runtime settings workaround",
+                "Applied": False,
+                "Detail": f"settings.json parse error: {e}",
+            }
+
+        if not isinstance(settings, dict):
+            return {
+                "Name": "temporary runtime settings workaround",
+                "Applied": False,
+                "Detail": "settings.json root is not an object",
+            }
+
+    before = json.dumps(settings, sort_keys=True, ensure_ascii=False)
+
+    settings["jetski.cloudCodeUrl"] = CLOUD_CODE_ENDPOINT
+    settings["codeiumDev.forceDisableExperiments"] = RUNTIME_EXPERIMENTS_VALUE
+
+    env = settings.get("codeiumDev.languageServerEnv", {})
+    if not isinstance(env, dict):
+        env = {}
+    env["BORG_DISABLE_EXPERIMENTS"] = RUNTIME_EXPERIMENTS_VALUE
+    env["BORG_EXPERIMENTS"] = ""
+    settings["codeiumDev.languageServerEnv"] = env
+
+    after = json.dumps(settings, sort_keys=True, ensure_ascii=False)
+    if after == before:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": "already present",
+        }
+
+    backup_path = ""
+    try:
+        backup_path = backup_json_file(settings_path)
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=4, ensure_ascii=False)
+            f.write("\n")
+    except Exception as e:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": f"write error: {e}",
+        }
+
+    detail = f"updated {settings_path}"
+    if backup_path:
+        detail += f"; backup: {os.path.basename(backup_path)}"
+    return {
+        "Name": "temporary runtime settings workaround",
+        "Applied": True,
+        "Detail": detail,
+    }
+
+
+def print_runtime_settings_result(result):
+    icon = "  ✓" if result.get("Applied") else "  ✗"
+    detail = f" — {result.get('Detail')}" if result.get("Detail") else ""
+    print(f"{icon} {result['Name']}{detail}")
+
+
+# ---------------------------------------------------------------------------
 # Патчи (каждый патч — отдельная функция)
 # ---------------------------------------------------------------------------
 
@@ -685,13 +827,14 @@ def do_patch(main_js_path, show_search_line=False):
         return
 
     current_is_patched = is_already_patched(content)
+    runtime_settings_checked = False
 
     if current_is_patched:
         print("  [i] File appears already patched.")
-        if not confirmed("Apply anyway?"):
-            clear_screen()
-            print_banner()
-            print_target_info(main_js_path, show_search_line=show_search_line)
+        print("  [*] Applying runtime settings workaround...")
+        print_runtime_settings_result(patch_runtime_settings(parsed_version))
+        runtime_settings_checked = True
+        if not confirmed("Apply main.js patches anyway?"):
             return
 
     # --- БЭКАП — копируем файл ДО любых изменений ---
@@ -741,6 +884,9 @@ def do_patch(main_js_path, show_search_line=False):
 
     hash_after = file_hash(main_js_path)
     resign_macos_bundle(main_js_path)
+    if not runtime_settings_checked:
+        print("  [*] Applying runtime settings workaround...")
+        print_runtime_settings_result(patch_runtime_settings(parsed_version))
     print(f"  [+] Patches: {applied}/{len(results)} applied")
     if hash_before and hash_after:
         print(f"  [+] Before:  {hash_before[:8]}...{hash_before[56:]}")

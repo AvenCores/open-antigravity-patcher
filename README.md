@@ -72,6 +72,7 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 - Проверка минимальной версии Antigravity (>= `1.22.2`) перед применением патча.
 - Определение версии Antigravity через реестр Windows, пакетный менеджер на Linux или `package.json` на macOS.
 - Обнаружение уже применённого патча с предложением применить повторно.
+- Временный runtime workaround для Antigravity `1.23+`: фиксация стабильного Cloud Code endpoint и отключение проблемных Cascade/model experiments через `settings.json`.
 
 ## 🚀 Как использовать
 1. Закройте Antigravity.
@@ -112,7 +113,7 @@ python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
 
 ## ❓ Что именно меняется
 
-Патчер вносит **4 правки** в `main.js`. Все изменения обратимы через резервную копию (`main.js.bak`).
+Патчер вносит **4 правки** в `main.js` и применяет отдельный временный runtime workaround в пользовательском `settings.json`. Изменения `main.js` обратимы через резервную копию (`main.js.bak`), а `settings.json` сохраняется в отдельный backup перед записью.
 
 ### 1. `if(isGoogleInternal)` → `if(true)`
 Заменяет проверку флага `isGoogleInternal` на безусловное `true`, снимая региональные/внутренние ограничения. Применяется ко всем вхождениям в файле (паттерн `if(this.<svc>.isGoogleInternal)`).
@@ -129,6 +130,34 @@ python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
 
 ### 4. Экран `ineligible` — обход (v1.22+)
 Заменяет spread тернар `...s?{}:{errorType:"ineligible",reason:a,verificationUrl:i}` на `...s?{}:{}` — ошибка ineligible не отправляется, экран блокировки не показывается.
+
+### 5. Временный runtime settings workaround (v1.23+)
+Начиная с Antigravity `1.23+` часть пользователей после обновления получает ошибку:
+
+```json
+{
+  "error": {
+    "code": 400,
+    "message": "User location is not supported for the API use.",
+    "status": "FAILED_PRECONDITION"
+  }
+}
+```
+
+В логах при этом появляются запросы к `daily-cloudcode-pa.googleapis.com` и новые Cascade/model experiments. Это временное решение: его стоит убрать или пересмотреть, когда Antigravity стабилизирует новый маршрут/эксперимент или вернёт совместимое поведение. Workaround добавляет в пользовательский `settings.json`:
+
+```json
+{
+  "jetski.cloudCodeUrl": "https://cloudcode-pa.googleapis.com",
+  "codeiumDev.forceDisableExperiments": "CASCADE_DEFAULT_MODEL_OVERRIDE,CASCADE_USE_EXPERIMENT_CHECKPOINTER,CASCADE_NEW_MODELS_NUX,CASCADE_NEW_WAVE_2_MODELS_NUX",
+  "codeiumDev.languageServerEnv": {
+    "BORG_DISABLE_EXPERIMENTS": "CASCADE_DEFAULT_MODEL_OVERRIDE,CASCADE_USE_EXPERIMENT_CHECKPOINTER,CASCADE_NEW_MODELS_NUX,CASCADE_NEW_WAVE_2_MODELS_NUX",
+    "BORG_EXPERIMENTS": ""
+  }
+}
+```
+
+Если `settings.json` уже существует, перед изменением создаётся резервная копия вида `settings.json.bak-YYYYMMDD-HHMMSS`. Если `main.js` уже пропатчен, пункт `Apply patch` всё равно применит runtime workaround без необходимости повторно менять `main.js`.
 
 > **Примечание:** 
 > - Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.
