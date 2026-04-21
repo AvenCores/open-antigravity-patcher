@@ -147,6 +147,8 @@ python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
      - `%PROGRAMFILES(X86)%\Antigravity`
    - **Linux:**
      - `/usr/share/antigravity`
+     - `/opt/Antigravity`
+     - `/opt/Antigravity/resources/app/out`
    - **macOS:**
      - `/Applications/Antigravity.app/Contents/Resources/app`
      - `~/Applications/Antigravity.app/Contents/Resources/app`

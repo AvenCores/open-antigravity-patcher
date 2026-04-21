@@ -164,7 +164,11 @@ def find_install_root():
         for app in mac_candidates:
             candidates.append(os.path.join(app, "Contents", "Resources", "app"))
     elif os.name == "posix":
-        candidates.append("/usr/share/antigravity")
+        candidates.extend([
+            "/usr/share/antigravity",
+            "/opt/Antigravity",
+            "/opt/Antigravity/resources/app/out",
+        ])
 
     if os.name == "nt":
         local_app_data = os.environ.get("LOCALAPPDATA")
