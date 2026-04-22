@@ -214,8 +214,8 @@ python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
 ## 🛡️ Повышение прав
 
 - **Windows**: автоматический UAC-запрос через `ShellExecuteW` с параметром `runas`. Корректно обрабатывает пути с пробелами.
-- **Linux**: если скрипт запущен не от root, предлагает перезапуститься через `sudo` (`os.execvp`). При отказе продолжает с предупреждением о возможных ошибках записи.
-- **macOS**: использует ту же posix-ветку — `sudo` предлагается, если запущено без root. Для `~/Applications/Antigravity.app` на `sudo` можно ответить «n» (директория уже доступна на запись), для `/Applications/Antigravity.app` — согласиться.
+- **Linux**: если скрипт запущен не от root, предлагает перезапуститься через `sudo` (`os.execvp`). При отказе продолжает с предупреждением о возможных ошибках записи. При этом runtime workaround пишет в `settings.json` исходного пользователя (`SUDO_USER`/`SUDO_UID`), а не в `/root/.config/...`.
+- **macOS**: использует ту же posix-ветку — `sudo` предлагается, если запущено без root. Для `~/Applications/Antigravity.app` на `sudo` можно ответить «n» (директория уже доступна на запись), для `/Applications/Antigravity.app` — согласиться. Пользовательский `settings.json` при запуске через `sudo` также берётся из home исходного пользователя, а не `root`.
 
 ## 🍎 Особенности macOS
 

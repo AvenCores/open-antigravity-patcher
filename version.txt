@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 9, 0),
-    prodvers=(1, 0, 9, 0),
+    filevers=(1, 1, 0, 0),
+    prodvers=(1, 1, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -15,12 +15,12 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'avencores'),
          StringStruct('FileDescription', 'Open AG Patcher'),
-         StringStruct('FileVersion', '1.0.9'),
+         StringStruct('FileVersion', '1.1.0'),
          StringStruct('InternalName', 'open_ag_patcher'),
          StringStruct('LegalCopyright', '© 2026'),
          StringStruct('OriginalFilename', 'Open_AG_Patcher_Windows.exe'),
          StringStruct('ProductName', 'Open AG Patcher'),
-         StringStruct('ProductVersion', '1.0.9')])
+         StringStruct('ProductVersion', '1.1.0')])
       ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

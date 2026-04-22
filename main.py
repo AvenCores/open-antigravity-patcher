@@ -11,7 +11,12 @@ import subprocess
 from enum import Enum
 from packaging.version import Version
 
-VERSION = "1.0.9"
+try:
+    import pwd
+except ImportError:
+    pwd = None
+
+VERSION = "1.1.0"
 MIN_AG_VERSION = "1.22.2"
 USE_COLOR = False
 AUTH_PATCH_SWITCH_VERSION = Version("1.23")
@@ -421,8 +426,35 @@ def format_bytes(size_bytes):
 # Runtime settings workaround
 # ---------------------------------------------------------------------------
 
+def get_posix_invoking_user_home():
+    """Returns the invoking user's home on POSIX, even when running via sudo."""
+    if os.name != "posix":
+        return ""
+
+    if pwd is not None:
+        sudo_uid = os.environ.get("SUDO_UID")
+        if sudo_uid:
+            try:
+                return pwd.getpwuid(int(sudo_uid)).pw_dir
+            except Exception:
+                pass
+
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user:
+            try:
+                return pwd.getpwnam(sudo_user).pw_dir
+            except Exception:
+                pass
+
+    home = os.environ.get("HOME")
+    if home:
+        return home
+
+    return os.path.expanduser("~")
+
+
 def get_user_settings_path():
-    """Returns the Antigravity user settings.json path for the current OS."""
+    """Returns the Antigravity user settings.json path for the current OS/user."""
     if os.name == "nt":
         app_data = os.environ.get("APPDATA")
         if app_data:
@@ -430,12 +462,20 @@ def get_user_settings_path():
         return ""
 
     if sys.platform == "darwin":
-        return os.path.expanduser(
-            "~/Library/Application Support/Antigravity/User/settings.json"
+        return os.path.join(
+            get_posix_invoking_user_home(),
+            "Library",
+            "Application Support",
+            "Antigravity",
+            "User",
+            "settings.json",
         )
 
     if os.name == "posix":
-        config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+        if os.environ.get("SUDO_USER") or os.environ.get("SUDO_UID"):
+            config_home = os.path.join(get_posix_invoking_user_home(), ".config")
+        else:
+            config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
         return os.path.join(config_home, "Antigravity", "User", "settings.json")
 
     return ""
