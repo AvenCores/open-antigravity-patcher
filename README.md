@@ -94,8 +94,8 @@ python main.py
 Запуск с указанием пути:
 ```bash
 # Windows
-python main.py "C:\\Program Files\\Antigravity"
-python main.py "C:\\Program Files\\Antigravity\\resources\\app\\out\\main.js"
+python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity"
+python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity\\resources\\app\\out\\main.js"
 
 # Linux
 python main.py /usr/share/antigravity
@@ -172,8 +172,6 @@ python3 main.py /Applications/Antigravity.app/Contents/Resources/app/out/main.js
 3. Автоматический поиск по стандартным путям:
    - **Windows:**
      - `%LOCALAPPDATA%\Programs\Antigravity`
-     - `%PROGRAMFILES%\Antigravity`
-     - `%PROGRAMFILES(X86)%\Antigravity`
    - **Linux:**
      - `/usr/share/antigravity`
      - `/opt/Antigravity`
