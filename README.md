@@ -61,6 +61,24 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 }
 ```
 
+## ⚠️ Ошибка HTTP 429 Too Many Requests
+Если вы столкнулись с ошибкой `HTTP 429 Too Many Requests`, это означает, что лимиты (квоты) на стороне Google исчерпаны. Это ошибка на стороне самого Google, и патчер здесь не поможет.
+
+**Решение:**
+- Смена аккаунта Google.
+- Примечание и обсуждение в [issue #10](https://github.com/AvenCores/open-antigravity-patcher/issues/10).
+
+**Пример ошибки:**
+```json
+{
+  "error": {
+    "code": 429,
+    "message": "Resource has been exhausted (e.g. check quota).",
+    "status": "RESOURCE_EXHAUSTED"
+  }
+}
+```
+
 ## 🌟 Возможности
 - Автоматический поиск установленного Antigravity в стандартных путях и реестре Windows.
 - Поддержка Linux: поиск по `/usr/share/antigravity`, определение версии через `dpkg`, `rpm` и `package.json`.
