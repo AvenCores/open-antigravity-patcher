@@ -244,31 +244,36 @@ def find_main_js(root):
 def get_ag_version(main_js_path):
     """Читает версию Antigravity из реестра Windows или package.json на Linux."""
     if os.name == "posix":
-        # Сначала пробуем dpkg (apt-установка)
-        try:
-            result = subprocess.run(
-                ["dpkg-query", "-W", "-f=${Version}", "antigravity"],
-                capture_output=True, text=True,
-            )
-            if result.returncode == 0:
-                ver = result.stdout.strip()
-                if ver:
-                    return ver
-        except Exception:
-            pass
+        # Пробуем менеджеры пакетов (apt, rpm) с разными именами
+        pkg_names = ["antigravity", "antigravity-bin", "antigravity-custom"]
+        
+        # dpkg-query (Debian/Ubuntu)
+        for pkg in pkg_names:
+            try:
+                result = subprocess.run(
+                    ["dpkg-query", "-W", "-f=${Version}", pkg],
+                    capture_output=True, text=True,
+                )
+                if result.returncode == 0:
+                    ver = result.stdout.strip()
+                    if ver:
+                        return ver
+            except Exception:
+                pass
 
-        # rpm-based (Fedora, RHEL, openSUSE и др.)
-        try:
-            result = subprocess.run(
-                ["rpm", "-q", "--queryformat", "%{VERSION}", "antigravity"],
-                capture_output=True, text=True,
-            )
-            if result.returncode == 0:
-                ver = result.stdout.strip()
-                if ver:
-                    return ver
-        except Exception:
-            pass
+        # rpm (Fedora/RHEL/openSUSE)
+        for pkg in pkg_names:
+            try:
+                result = subprocess.run(
+                    ["rpm", "-q", "--queryformat", "%{VERSION}", pkg],
+                    capture_output=True, text=True,
+                )
+                if result.returncode == 0:
+                    ver = result.stdout.strip()
+                    if ver:
+                        return ver
+            except Exception:
+                pass
 
         # Fallback: package.json (portable / snap / flatpak)
         for rel in (
@@ -1008,9 +1013,14 @@ def do_fix_429():
 
     try:
         shutil.move(data_dir, backup_dir)
+    except PermissionError:
+        print(color("  [!] Permission denied: Could not move data directory.", COLOR_RED))
+        print(color("  [!] Antigravity is likely still running or holding files.", COLOR_RED))
+        print("  [i] Close Antigravity completely (check Task Manager) and try again.")
+        return
     except Exception as e:
         print(color(f"  [!] Failed to move data directory: {e}", COLOR_RED))
-        print("  [i] Try closing Antigravity and run the patcher as administrator.")
+        print("  [i] Try running the patcher as administrator.")
         return
 
     print(color("  [+] Data moved to backup", COLOR_GREEN))
@@ -1029,13 +1039,16 @@ def do_fix_429():
             dst = os.path.join(user_dir, folder)
             if os.path.isdir(src):
                 print(f"  [*] Restoring {folder}...")
-                shutil.copytree(src, dst)
-                restored_count += 1
+                try:
+                    shutil.copytree(src, dst)
+                    restored_count += 1
+                except Exception as e:
+                    print(color(f"  [!] Could not restore {folder}: {e}", COLOR_YELLOW))
         
         if restored_count > 0:
             print(color(f"  [+] Restored {restored_count} storage folder(s)", COLOR_GREEN))
         else:
-            print(color("  [i] No storage folders found to restore", COLOR_YELLOW))
+            print(color("  [i] No storage folders were restored", COLOR_YELLOW))
 
         # Fix permissions on POSIX if running as root
         fix_posix_permissions(data_dir)
@@ -1045,7 +1058,7 @@ def do_fix_429():
         print("      1. Start Antigravity.")
         print("      2. Sign in to your account.")
         print("      3. If you still see errors, run 'Apply patch' (Option 1) again.")
-        print("      [!] Note: VPNs or other bypass methods might be detected by Google and cause 429 errors.")
+        print("      [!] Note: VPNs might cause 429 errors.")
         print(f"  [i] Your backup is safe at: {backup_dir}")
 
     except Exception as e:
@@ -1108,7 +1121,7 @@ def do_restore(main_js_path, show_search_line=False):
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(data)
-        shutil.move(tmp_path, main_js_path)
+        os.replace(tmp_path, main_js_path)
     except Exception as e:
         print(f"\n  [!] Restore error: {e}")
         if os.path.exists(tmp_path):
