@@ -682,19 +682,6 @@ def _patch_is_google_internal_comma(content, ag_version=None):
     }
 
 
-def _patch_onboard_user(content):
-    """onboardUser injection после loadCodeAssist.
-
-    ОТКЛЮЧЕНО: в v1.22+ onboardUser уже вызывается нативно 3 раза,
-    инъекция дублирует вызов и ломает поток авторизации.
-    """
-    return content, {
-        "Name": "onboardUser injection",
-        "Applied": False,
-        "Detail": "Skipped — causes auth hang in v1.22+",
-    }
-
-
 def _patch_ide_name(content):
     """ideName → antigravity-insiders"""
     new_content = content.replace('ideName:"antigravity"', 'ideName:"antigravity-insiders"')
@@ -702,30 +689,6 @@ def _patch_ide_name(content):
         "Name": "ideName → antigravity-insiders",
         "Applied": new_content != content,
         "Detail": "",
-    }
-
-
-def _patch_refresh_user_status(content):
-    """refreshUserStatus wrapper с fallback на pro-tier."""
-    re_refresh = re.compile(r"await this\.(([a-zA-Z_$]+\.)?refreshUserStatus\(([a-zA-Z_$]+)\))")
-    refresh_matches = list(re_refresh.finditer(content))
-
-    if not refresh_matches:
-        return content, {"Name": "refreshUserStatus wrapper", "Applied": False, "Detail": ""}
-
-    # Итерируем в обратном порядке, чтобы замены не сдвигали индексы
-    new_content = content
-    for rm in reversed(refresh_matches):
-        inner_call = rm.group(1)
-        arg_r = rm.group(3)
-        wrapped = f'await(async()=>{{try{{return await this.{inner_call}}}catch(_e){{return{{settings:{{}},userTier:{{id:"pro",description:"Pro"}},oauthTokenInfo:{arg_r}}}}}}})()'
-        start, end = rm.start(), rm.end()
-        new_content = new_content[:start] + wrapped + new_content[end:]
-
-    return new_content, {
-        "Name": "refreshUserStatus → wrapped with fallback",
-        "Applied": new_content != content,
-        "Detail": f"{len(refresh_matches)} calls wrapped",
     }
 
 
@@ -750,20 +713,6 @@ def _patch_ineligible_screen(content):
         "Applied": False,
         "Detail": "pattern not found",
     }
-
-
-def apply_patches(content):
-    results = []
-    for patch_fn in (
-        _patch_is_google_internal,
-        _patch_onboard_user,
-        _patch_ide_name,
-        _patch_refresh_user_status,
-        _patch_ineligible_screen,
-    ):
-        content, result = patch_fn(content)
-        results.append(result)
-    return content, results
 
 
 def apply_patches_minimal(content, ag_version=None):
@@ -910,9 +859,9 @@ def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_c
         warnings.append(
             f"backup size is only {format_bytes(backup_size)} and it looks almost empty"
         )
-    elif current_size and backup_size < max(4096, current_size // 10):
+    elif backup_size < 4096 or (current_size > 0 and backup_size < current_size // 10):
         warnings.append(
-            f"backup is much smaller than current main.js "
+            f"backup is much smaller than expected "
             f"({format_bytes(backup_size)} vs {format_bytes(current_size)})"
         )
 
@@ -1167,15 +1116,6 @@ def do_restore(main_js_path, show_search_line=False):
     hash_after = file_hash(main_js_path)
     resign_macos_bundle(main_js_path)
 
-    # Удаляем мета-файлы бэкапа — после восстановления они уже неактуальны
-    for ext in (".version", ".sha256"):
-        meta = backup_path + ext
-        if os.path.exists(meta):
-            try:
-                os.remove(meta)
-            except Exception:
-                pass
-
     print_target_info(main_js_path, show_search_line=show_search_line)
     print()
     if hash_before and hash_after and hash_before != hash_after:
@@ -1190,7 +1130,6 @@ def do_restore(main_js_path, show_search_line=False):
 # ---------------------------------------------------------------------------
 
 def main():
-    setup_console()
     print_banner()
 
     main_js_path = ""
