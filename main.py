@@ -1433,6 +1433,7 @@ def extract_asar(asar_path, dest_dir):
                         out_f.write(data)
 
         extract_entry(header, '')
+        fix_posix_permissions(dest_dir)
         print("  [+] Extraction completed successfully.")
         return True
 
