@@ -46,8 +46,6 @@
 
 ![1](https://i.ibb.co/bjN3fGZH/1.png)
 
----
-
 ## ⚠️ Ошибка HTTP 500 Internal Server Error
 Если при запросе в Antigravity IDE появляется ошибка HTTP 500 Internal Server Error, то ничего не поделать, меняйте аккаунт (желательно на регион, где Antigravity IDE официально работает или куплена платная подписка), платная утилита также её не решала.
 
