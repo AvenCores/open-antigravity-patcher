@@ -330,8 +330,8 @@ xcode-select --install
 ```bash
 pip install -r requirements.txt
 Windows: pyinstaller --onefile --uac-admin --icon=icon.ico --name="Open_AG_Patcher_Windows" --noupx --clean --version-file=version.txt main.py
-Linux:   pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" main.py
-macOS:   pyinstaller --onefile --name="Open_AG_Patcher_macOS" main.py
+Linux:   pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
+macOS:   pyinstaller --onefile --name="Open_AG_Patcher_macOS" --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
 ```
 
 ## Структура проекта
