@@ -1,7 +1,7 @@
 import re
 from packaging.version import Version
 
-VERSION = "1.1.4"
+VERSION = "1.1.5"
 MIN_AG_VERSION = "2.0.1"
 AUTH_PATCH_SWITCH_VERSION = Version("1.23")
 RUNTIME_SETTINGS_SWITCH_VERSION = Version("1.23")
