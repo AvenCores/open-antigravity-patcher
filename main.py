@@ -2151,7 +2151,7 @@ def main():
                     break
                 
                 if sub_choice == "1":
-                    print("  [i] Enter the path to Antigravity IDE folder or main.js file.")
+                    print("\n  [i] Enter the path to Antigravity IDE folder or main.js file.")
                     print_path_examples()
                     raw = input(color("\n  IDE Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
                     if raw:
@@ -2164,7 +2164,7 @@ def main():
                             print(color("  [!] Could not resolve a valid Antigravity IDE target.", COLOR_RED))
                     pause()
                 elif sub_choice == "2":
-                    print("  [i] Enter the path to Antigravity folder.")
+                    print("\n  [i] Enter the path to Antigravity folder.")
                     print_path_examples()
                     raw = input(color("\n  Antigravity Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
                     if raw:
