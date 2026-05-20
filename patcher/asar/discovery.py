@@ -93,6 +93,11 @@ def find_antigravity_root():
         except ImportError:
             pass
 
+    # Always execute portable search to print matches for visibility
+    from patcher.ide.discovery import find_portable_candidates
+    portable = find_portable_candidates("antigravity")
+
+    # 1. Return standard if valid
     for path in candidates:
         path = os.path.abspath(path)
         if os.path.exists(os.path.join(path, "resources", "app.asar")) or \
@@ -104,12 +109,11 @@ def find_antigravity_root():
                os.path.exists(os.path.join(resources_path, "app1.asar")):
                 return path
 
-    # Fallback: heuristic search for portable Antigravity
-    from patcher.ide.discovery import find_portable_candidates
-    portable = find_portable_candidates("antigravity")
+    # 2. Return portable if found
     if portable:
         return portable[0]
 
+    # 3. Fallback to any existing candidate directory
     for path in candidates:
         if os.path.isdir(path):
             return path

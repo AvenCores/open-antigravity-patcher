@@ -23,13 +23,20 @@ def find_portable_candidates(search_type="ide"):
     import string
     roots = []
 
-    # 1. Сначала добавляем специфичные папки пользователя (включая русские локализации)
-    home = os.path.expanduser("~")
+    # 1. Получаем домашнюю папку пользователя
+    from patcher.utils.file import get_posix_invoking_user_home
+    home = ""
+    if sys.platform != "win32":
+        home = get_posix_invoking_user_home()
+    if not home:
+        home = os.path.expanduser("~")
+
+    # Добавляем специфичные папки пользователя (включая русские локализации и нижний регистр)
     if home and os.path.isdir(home):
         standard_subs = [
-            "Downloads", "Загрузки",
-            "Desktop", "Рабочий стол",
-            "Documents", "Документы"
+            "Downloads", "Загрузки", "downloads", "загрузки",
+            "Desktop", "Рабочий стол", "desktop", "рабочий стол",
+            "Documents", "Документы", "documents", "документы"
         ]
         for sub in standard_subs:
             p = os.path.join(home, sub)
@@ -41,7 +48,10 @@ def find_portable_candidates(search_type="ide"):
         import subprocess
         for folder_type in ["DOWNLOAD", "DESKTOP", "DOCUMENTS"]:
             try:
-                res = subprocess.run(["xdg-user-dir", folder_type], capture_output=True, text=True, check=False)
+                cmd = ["xdg-user-dir", folder_type]
+                if sudo_user:
+                    cmd = ["sudo", "-u", sudo_user, "xdg-user-dir", folder_type]
+                res = subprocess.run(cmd, capture_output=True, text=True, check=False)
                 if res.returncode == 0:
                     path = res.stdout.strip()
                     if path and os.path.isdir(path):
@@ -105,16 +115,15 @@ def find_portable_candidates(search_type="ide"):
                 if rel == ".":
                     depth = 0
                 else:
-                    depth = len(rel.split(os.path.sep))
+                    depth = len(rel.replace("\\", "/").split("/"))
             except ValueError:
                 depth = 999
 
-            if depth >= 2:
+            if depth >= 3:
                 dirnames[:] = []  # Не спускаемся глубже
 
-            dirname = os.path.basename(dirpath).lower()
             # Проверяем, подходит ли папка под критерий эвристики
-            is_match = "antigravity" in dirname or dirpath == root or root == cwd
+            is_match = "antigravity" in dirpath.lower() or dirpath == root or root == cwd
 
             if is_match:
                 if search_type == "ide":
@@ -202,6 +211,7 @@ def find_install_root():
         except ImportError:
             pass
 
+    found_standard = ""
     for path in candidates:
         for sub in [
             os.path.join("resources", "app", "out", "main.js"),
@@ -210,12 +220,21 @@ def find_install_root():
             "main.js",
         ]:
             if os.path.exists(os.path.join(path, sub)):
-                return path
+                found_standard = path
+                break
+        if found_standard:
+            break
 
-    # Fallback: heuristic search for portable IDE
+    # Always execute portable search to print matches for visibility
     portable = find_portable_candidates("ide")
+
+    if found_standard:
+        return found_standard
+
     if portable:
         return portable[0]
+
+    return ""
 
     return ""
 
