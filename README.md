@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
     <a href="https://www.youtube.com/@avencores/" target="_blank">
       <img src="https://github.com/user-attachments/assets/338bcd74-e3c3-4700-87ab-7985058bd17e" alt="YouTube" height="40">
     </a>
@@ -21,7 +21,7 @@
 [![GitHub pull requests](https://img.shields.io/github/issues-pr/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/pulls)
 [![GitHub issues](https://img.shields.io/github/issues/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/issues)
 
-Опенсорс патчер для Antigravity IDE: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity-IDE).
+Опенсорс патчер для Antigravity IDE и standalone-приложения Antigravity: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity-IDE).
 
 ![maxresdefault](https://i.ibb.co/qL6V7mf0/firefox-1howp-IRks4.png)
 
@@ -109,10 +109,12 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 - [5xx Server Errors: The Complete Guide](https://komodor.com/learn/5xx-server-errors-the-complete-guide/) — подробный разбор серверных ошибок.
 
 ## 🌟 Возможности
-- Автоматический поиск установленного Antigravity IDE в стандартных путях и реестре Windows.
+- Автоматический поиск установленного Antigravity IDE и standalone-приложения Antigravity в стандартных путях и реестре Windows.
+- Полноценная распаковка, модификация и обратная запаковка `app.asar` для Antigravity с сохранением структуры внешних распакованных файлов (`.unpacked`).
+- Интегрированный локальный HTTP-прокси сервер для динамического патчинга загружаемого JS-кода в standalone-приложении Antigravity.
 - Поддержка Linux: поиск по `/usr/share/antigravity-ide`, определение версии через `dpkg`, `rpm` и `package.json`.
-- Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js`.
-- Создание резервной копии `main.js.bak` перед изменениями.
+- Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js` или `app.asar`.
+- Создание резервной копии перед изменениями.
 - Применение и откат патча через простое меню.
 - Поддержка путей `resources/app/out/main.js` и `resources/app/main.js`.
 - Цветной вывод и попытка автоматического повышения прав (UAC на Windows, предложение `sudo` на Linux).
@@ -122,17 +124,19 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 - Временный runtime workaround для Antigravity IDE `1.23+`: фиксация стабильного Cloud Code endpoint и отключение проблемных Cascade/model experiments через `settings.json`.
 
 ## 🚀 Как использовать
-1. Закройте Antigravity IDE.
+1. Закройте Antigravity IDE или Antigravity.
 2. Запустите патчер от имени администратора (скрипт сам запросит повышение прав при необходимости).
 3. В меню выберите нужное действие:
 
 | Пункт меню | Описание |
 |---|---|
-| `1. Apply patch` | Применить патч к `main.js` |
-| `2. Restore from backup` | Восстановить оригинальный файл из резервной копии |
-| `3. Fix HTTP 429` | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
-| `4. Open GitHub repository` | Открыть страницу проекта в браузере |
-| `5. Select custom path` | Выбрать путь к `main.js` вручную |
+| `1. Apply Antigravity IDE patch` | Применить патч к `main.js` для Antigravity IDE |
+| `2. Apply Antigravity patch` | Применить патч к `app.asar` для standalone Antigravity |
+| `3. Restore Antigravity IDE from backup` | Восстановить оригинальный `main.js` для Antigravity IDE |
+| `4. Restore Antigravity from backup (Rollback)` | Восстановить оригинальный `app.asar` для Antigravity |
+| `5. Fix HTTP 429` | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
+| `6. Open GitHub repository` | Открыть страницу проекта в браузере |
+| `7. Select custom path` | Выбрать путь к папке приложения или файлу вручную |
 | `0. Exit` | Выйти |
 
 Запуск из исходников:
@@ -140,27 +144,28 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 python main.py
 ```
 
-Запуск с указанием пути:
+Запуск с указанием пути (для Antigravity IDE или standalone Antigravity):
 ```bash
 # Windows
 python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity IDE"
-python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity IDE\\resources\\app\\out\\main.js"
+python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity\\resources\\app.asar"
 
 # Linux
 python main.py /usr/share/antigravity-ide
-python main.py /usr/share/antigravity-ide/resources/app/out/main.js
+python main.py /opt/Antigravity
 
 # macOS
 python3 main.py /Applications/Antigravity\ IDE.app
-python3 main.py ~/Applications/Antigravity\ IDE.app
-python3 main.py /Applications/Antigravity\ IDE.app/Contents/Resources/app/out/main.js
+python3 main.py /Applications/Antigravity.app
 ```
 
-Если `main.js` находится рядом со скриптом, путь указывать не нужно — он будет найден автоматически.
+Если `main.js` или `app.asar` находится рядом со скриптом, путь указывать не нужно — они будут найдены автоматически.
 
 > **macOS:** если `Antigravity IDE.app` лежит в `/Applications`, запись потребует `sudo` (скрипт сам предложит перезапуск). Для установки в `~/Applications` или пользовательскую директорию `sudo` не нужен. После успешного патча `.app` автоматически переподписывается ad-hoc подписью (`codesign --force --deep --sign -`) — без этого Electron с Hardened Runtime не запустится на macOS.
 
 ## ❓ Что именно меняется
+
+### Патч для Antigravity IDE
 
 Патчер вносит **4 правки** в `main.js` и применяет отдельный временный runtime workaround в пользовательском `settings.json`. Изменения `main.js` обратимы через резервную копию (`main.js.bak`), а `settings.json` сохраняется в отдельный backup перед записью.
 
@@ -207,6 +212,15 @@ python3 main.py /Applications/Antigravity\ IDE.app/Contents/Resources/app/out/ma
 ```
 
 Если `settings.json` уже существует, перед изменением создаётся резервная копия вида `settings.json.bak-YYYYMMDD-HHMMSS`. Если `main.js` уже пропатчен, пункт `Apply patch` всё равно применит runtime workaround без необходимости повторно менять `main.js`.
+
+### Патч для Standalone Antigravity (ASAR)
+
+Для standalone-версии Antigravity процесс патчинга отличается из-за того, что логика интерфейса загружается динамически из сети:
+1. Оригинальный архив копируется в резервную копию `app.asar.bak` (или `app1.asar.bak`) для возможности последующего отката, а сам архив распаковывается во временную папку.
+2. В файле `dist/main.js` регистрируется перехватчик сетевых запросов.
+3. При запуске Antigravity все запросы к фронтенд-скриптам (`/main.js`) перенаправляются на локальный HTTP-прокси сервер, создаваемый внутри самого приложения.
+4. Прокси-сервер скачивает оригинальный фронтенд-скрипт, на лету подменяет в нем проверки `isGoogleInternal` на `true`, перенаправляет состояния ошибок авторизации на успешный вход (`signedIn`), кэширует результат и отдает его приложению.
+5. Измененные файлы запаковываются обратно в `app.asar` с корректным вычислением хэшей целостности (SHA256 blocks) и сохранением структуры внешних распакованных файлов (`.unpacked`).
 
 > **Примечание:** 
 > - Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity IDE `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.

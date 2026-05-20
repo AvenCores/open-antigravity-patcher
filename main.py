@@ -8,6 +8,8 @@ import time
 import ctypes
 import webbrowser
 import subprocess
+import struct
+import tempfile
 from enum import Enum
 from packaging.version import Version
 
@@ -800,48 +802,74 @@ def confirmed(question):
     return prompt_yn(question) == "y"
 
 
-def print_target_info(main_js_path, show_search_line=False):
+def print_target_info(main_js_path, antigravity_root="", show_search_line=False):
     if show_search_line:
-        print("  [*] Searching for Antigravity IDE installation...")
-    print(f"  [*] Target: {color(main_js_path, COLOR_CYAN)}")
-
-    exists = os.path.exists(main_js_path)
-    is_dir = os.path.isdir(main_js_path) if exists else False
+        print("  [*] Searching for installations...")
     
-    if not exists:
-        print(f"  [*] Status: {color('not found', COLOR_RED)}")
-        print(f"  [*] Patch:  {color('n/a', COLOR_YELLOW)}")
-    elif is_dir:
-        print(f"  [*] Status: {color('directory', COLOR_YELLOW)}")
-        print(f"  [*] Patch:  {color('missing main.js', COLOR_RED)}")
+    # 1. Antigravity IDE Info
+    print(f"  [*] Antigravity IDE Target: {color(main_js_path if main_js_path else 'Not found', COLOR_CYAN)}")
+    if main_js_path and os.path.exists(main_js_path):
+        exists = os.path.exists(main_js_path)
+        is_dir = os.path.isdir(main_js_path) if exists else False
+        if is_dir:
+            print(f"      Status:  {color('directory (missing main.js)', COLOR_YELLOW)}")
+        else:
+            try:
+                with open(main_js_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                print(f"      Status:  {color('found', COLOR_GREEN)}")
+                if is_already_patched(content):
+                    patch_text = color("already patched", COLOR_YELLOW)
+                else:
+                    patch_text = color("not patched", COLOR_GREEN)
+                print(f"      Patch:   {patch_text}")
+            except Exception:
+                print(f"      Status:  {color('unreadable', COLOR_RED)}")
+                print(f"      Patch:   {color('unreadable', COLOR_RED)}")
+            
+            ver_str = get_ag_version(main_js_path)
+            if ver_str:
+                print(f"      Version: {color(ver_str, COLOR_GREEN)}")
+            else:
+                print(color("      Version: not detected", COLOR_YELLOW))
+            
+            size = file_size(main_js_path)
+            print(f"      Size:    {color(format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)}")
     else:
-        try:
-            with open(main_js_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            print(f"  [*] Status: {color('found', COLOR_GREEN)}")
-            if is_already_patched(content):
+        print(f"      Status:  {color('not found', COLOR_RED)}")
+
+    print()
+
+    # 2. Antigravity Info
+    print(f"  [*] Antigravity Target:     {color(antigravity_root if antigravity_root else 'Not found', COLOR_CYAN)}")
+    if antigravity_root and os.path.isdir(antigravity_root):
+        asar_path, _ = resolve_antigravity_paths(antigravity_root)
+        if os.path.exists(asar_path):
+            print(f"      Status:  {color('found', COLOR_GREEN)}")
+            if is_antigravity_patched(asar_path):
                 patch_text = color("already patched", COLOR_YELLOW)
             else:
                 patch_text = color("not patched", COLOR_GREEN)
-            print(f"  [*] Patch:  {patch_text}")
-        except Exception:
-            print(f"  [*] Status: {color('unreadable', COLOR_RED)}")
-            print(f"  [*] Patch:  {color('unreadable', COLOR_RED)}")
-
-    ver_str = get_ag_version(main_js_path)
-    if ver_str:
-        print(f"  [*] Antigravity IDE version: {color(ver_str, COLOR_GREEN)}")
+            print(f"      Patch:   {patch_text}")
+            
+            ver_str = read_package_json_from_asar(asar_path)
+            if ver_str:
+                print(f"      Version: {color(ver_str, COLOR_GREEN)}")
+            else:
+                print(color("      Version: not detected", COLOR_YELLOW))
+                
+            size = file_size(asar_path)
+            print(f"      Size:    {color(format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)}")
+        else:
+            print(f"      Status:  {color('ASAR missing', COLOR_RED)}")
     else:
-        print(color("  [!] Antigravity IDE version: not detected", COLOR_YELLOW))
-    
-    size = file_size(main_js_path)
-    print(f"  [*] Size:   {color(format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)}")
+        print(f"      Status:  {color('not found', COLOR_RED)}")
 
 
-def redraw_main_screen(main_js_path, show_search_line=False):
+def redraw_main_screen(main_js_path, antigravity_root="", show_search_line=False):
     clear_screen()
     print_banner()
-    print_target_info(main_js_path, show_search_line=show_search_line)
+    print_target_info(main_js_path, antigravity_root, show_search_line=show_search_line)
     print()
 
 
@@ -1149,6 +1177,824 @@ def do_restore(main_js_path, show_search_line=False):
 
 
 # ---------------------------------------------------------------------------
+# Antigravity (asar-based patching)
+# ---------------------------------------------------------------------------
+
+INTEGRITY_BLOCK_SIZE = 4 * 1024 * 1024
+PACK_EXCLUDE_PATHS = {
+    'downloaded_frontend_main.js',
+    'frontend_patch_result.json',
+    'dist/main.js.bak',
+}
+
+ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
+    // Start local frontend patch server
+    let localServerPort = 0;
+    const frontendPatchCache = new Map();
+    const frontendPatchFs = require('fs');
+    const frontendPatchPath = require('path');
+    const frontendPatchResultPath = frontendPatchPath.join('{dest_folder}', 'frontend_patch_result.json');
+    const patchFrontendMainJs = (content) => {
+        const results = [];
+        if (content.includes('csrfToken') && content.includes('isGoogleInternal')) {
+            let nextContent = content.split('isGoogleInternal:!1').join('isGoogleInternal:!0');
+            let applied = nextContent !== content;
+            results.push({
+                name: 'isGoogleInternal:!1 -> isGoogleInternal:!0 (frontend)',
+                applied,
+                detail: applied ? 'Forced frontend isGoogleInternal to true' : 'isGoogleInternal:!1 not found',
+            });
+            content = nextContent;
+            nextContent = content
+                .split('SET_INELIGIBLE:{target:".loginError"')
+                .join('SET_INELIGIBLE:{target:".signedIn"')
+                .split('SET_ERROR:{target:".loginError"')
+                .join('SET_ERROR:{target:".signedIn"');
+            applied = nextContent !== content;
+            results.push({
+                name: 'SET_INELIGIBLE/SET_ERROR -> target:.signedIn (frontend)',
+                applied,
+                detail: applied ? 'Redirected ineligible/error states to signedIn' : 'loginError targets not found',
+            });
+            content = nextContent;
+        }
+        else {
+            results.push({
+                name: 'frontend marker check',
+                applied: false,
+                detail: 'csrfToken/isGoogleInternal markers not found',
+            });
+        }
+        return { content, results };
+    };
+    const isFrontendMainPatched = (content) => {
+        if (content.includes('csrfToken') && content.includes('isGoogleInternal')) {
+            return !content.includes('isGoogleInternal:!1')
+                && content.includes('SET_INELIGIBLE:{target:".signedIn"}');
+        }
+        return false;
+    };
+    const writeFrontendPatchResult = (sourceUrl, content, results) => {
+        const verified = isFrontendMainPatched(content);
+        try {
+            frontendPatchFs.writeFileSync(frontendPatchResultPath, JSON.stringify({
+                sourceUrl,
+                verified,
+                size: Buffer.byteLength(content, 'utf8'),
+                results,
+                at: new Date().toISOString(),
+            }, null, 2));
+        } catch (err) {
+            console.error('[Debug] Failed to write frontend patch result:', err);
+        }
+        return verified;
+    };
+    const getPatchedFrontendMainJs = (sourceUrl) => {
+        if (frontendPatchCache.has(sourceUrl)) {
+            return frontendPatchCache.get(sourceUrl);
+        }
+        const patchPromise = new Promise((resolve, reject) => {
+            const https = require('https');
+            const agent = new https.Agent({ rejectUnauthorized: false });
+            https.get(sourceUrl, { agent, headers: { 'Accept-Encoding': 'identity' } }, (upstream) => {
+                const chunks = [];
+                upstream.on('data', (chunk) => {
+                    chunks.push(chunk);
+                });
+                upstream.on('end', () => {
+                    const originalContent = Buffer.concat(chunks).toString('utf8');
+                    const { content, results } = patchFrontendMainJs(originalContent);
+                    for (const result of results) {
+                        console.log(`[Debug] Frontend patch: ${result.name}; applied=${result.applied}; ${result.detail}`);
+                    }
+                    console.log(`[Debug] Frontend patch verification: ${writeFrontendPatchResult(sourceUrl, content, results) ? 'ok' : 'failed'}`);
+                    resolve(Buffer.from(content, 'utf8'));
+                });
+                upstream.on('error', reject);
+            }).on('error', reject);
+        }).catch((err) => {
+            frontendPatchCache.delete(sourceUrl);
+            throw err;
+        });
+        frontendPatchCache.set(sourceUrl, patchPromise);
+        return patchPromise;
+    };
+    try {
+        const http = require('http');
+        const localServer = http.createServer((req, res) => {
+            const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${localServerPort || 0}`);
+            if (requestUrl.pathname === '/main.js') {
+                const sourceUrl = requestUrl.searchParams.get('source');
+                if (!sourceUrl) {
+                    res.writeHead(400);
+                    res.end();
+                    return;
+                }
+                getPatchedFrontendMainJs(sourceUrl)
+                    .then((content) => {
+                    res.writeHead(200, {
+                        'Content-Type': 'application/javascript; charset=utf-8',
+                        'Access-Control-Allow-Origin': '*',
+                        'Content-Length': content.length,
+                    });
+                    res.end(content);
+                })
+                    .catch((err) => {
+                    console.error('[Debug] Local server failed to patch frontend main.js:', err);
+                    res.writeHead(502);
+                    res.end();
+                });
+                return;
+            }
+            res.writeHead(404);
+            res.end();
+        });
+        localServer.listen(0, '127.0.0.1', () => {
+            localServerPort = localServer.address().port;
+            console.log(`[Debug] Local patch server listening on port ${localServerPort}`);
+        });
+    } catch (err) {
+        console.error('[Debug] Failed to start local patch server:', err);
+    }
+    electron_1.session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+        console.log(`[Network Request] ${details.url}`);
+        if (details.url.endsWith('/main.js') && details.url.includes('127.0.0.1')) {
+            if (localServerPort && !details.url.includes(`:${localServerPort}`)) {
+                const redirectUrl = `http://127.0.0.1:${localServerPort}/main.js?source=${encodeURIComponent(details.url)}`;
+                console.log(`[Debug] Redirecting main.js request to local patch server: ${redirectUrl}`);
+                callback({ redirectURL: redirectUrl });
+                return;
+            }
+        }
+        callback({});
+    });
+"""
+
+def align_to(value, alignment):
+    remainder = value % alignment
+    return value if remainder == 0 else value + (alignment - remainder)
+
+def compute_integrity(file_path):
+    full_hash = hashlib.sha256()
+    block_hashes = []
+
+    with open(file_path, 'rb') as f:
+        while True:
+            block = f.read(INTEGRITY_BLOCK_SIZE)
+            if not block:
+                break
+            full_hash.update(block)
+            block_hashes.append(hashlib.sha256(block).hexdigest())
+
+    return {
+        "algorithm": "SHA256",
+        "hash": full_hash.hexdigest(),
+        "blockSize": INTEGRITY_BLOCK_SIZE,
+        "blocks": block_hashes,
+    }
+
+def find_unpacked_file(asar_path, current_path):
+    resource_dir = os.path.dirname(asar_path)
+    candidates = [
+        asar_path + '.unpacked',
+        os.path.join(resource_dir, 'app.asar.unpacked'),
+        os.path.join(resource_dir, 'app1.asar.unpacked'),
+    ]
+
+    seen = set()
+    for candidate_dir in candidates:
+        if candidate_dir in seen:
+            continue
+        seen.add(candidate_dir)
+        candidate_file = os.path.join(candidate_dir, current_path)
+        if os.path.exists(candidate_file):
+            return candidate_file
+
+    return None
+
+def extract_asar(asar_path, dest_dir):
+    asar_path = os.path.abspath(asar_path)
+    if not os.path.exists(asar_path):
+        print(f"  [!] Error: ASAR file not found at '{asar_path}'")
+        return False
+        
+    print(f"  [*] Extracting '{os.path.basename(asar_path)}' to temp directory...")
+    
+    with open(asar_path, 'rb') as f:
+        try:
+            pickle_header = struct.unpack('<I', f.read(4))[0]
+            header_size = struct.unpack('<I', f.read(4))[0]
+            json_size_plus_4 = struct.unpack('<I', f.read(4))[0]
+            json_size = struct.unpack('<I', f.read(4))[0]
+        except struct.error:
+            print("  [!] Error: Invalid ASAR file format (unable to read header structure).")
+            return False
+        
+        try:
+            json_bytes = f.read(json_size)
+            header = json.loads(json_bytes.decode('utf-8'))
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            print(f"  [!] Error: Failed to parse ASAR header JSON: {e}")
+            return False
+            
+        payload_offset = 8 + header_size
+        
+        def extract_entry(entry, current_path):
+            if 'files' in entry:
+                dir_path = os.path.join(dest_dir, current_path)
+                os.makedirs(dir_path, exist_ok=True)
+                for name, child in entry['files'].items():
+                    extract_entry(child, os.path.join(current_path, name))
+            else:
+                file_path = os.path.join(dest_dir, current_path)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                
+                if entry.get('unpacked'):
+                    src_file = find_unpacked_file(asar_path, current_path)
+                    if src_file:
+                        shutil.copy2(src_file, file_path)
+                    else:
+                        print(f"  [!] Warning: Unpacked file '{current_path}' not found in external directory.")
+                else:
+                    offset = int(entry['offset'])
+                    size = entry['size']
+                    f.seek(payload_offset + offset)
+                    data = f.read(size)
+                    with open(file_path, 'wb') as out_f:
+                        out_f.write(data)
+
+        extract_entry(header, '')
+        print("  [+] Extraction completed successfully.")
+        return True
+
+def get_unpacked_paths(asar_path):
+    unpacked_paths = set()
+    if not os.path.exists(asar_path):
+        return unpacked_paths
+        
+    try:
+        with open(asar_path, 'rb') as f:
+            pickle_header = struct.unpack('<I', f.read(4))[0]
+            header_size = struct.unpack('<I', f.read(4))[0]
+            json_size_plus_4 = struct.unpack('<I', f.read(4))[0]
+            json_size = struct.unpack('<I', f.read(4))[0]
+            json_bytes = f.read(json_size)
+            header = json.loads(json_bytes.decode('utf-8'))
+            
+            def collect_unpacked(entry, current_path):
+                if 'files' in entry:
+                    for name, child in entry['files'].items():
+                        collect_unpacked(child, os.path.join(current_path, name) if current_path else name)
+                else:
+                    if entry.get('unpacked'):
+                        unpacked_paths.add(current_path.replace('\\', '/'))
+            
+            collect_unpacked(header, '')
+    except Exception as e:
+        print(f"  [!] Warning: Could not read original ASAR header to check unpacked files: {e}")
+        
+    return unpacked_paths
+
+def build_asar_tree(source_dir, unpacked_paths, payload_file, unpacked_dir):
+    header = {"files": {}}
+    current_offset = 0
+    
+    all_files = []
+    for root, dirs, files in os.walk(source_dir):
+        for file in files:
+            full_path = os.path.join(root, file)
+            rel_path = os.path.relpath(full_path, source_dir).replace('\\', '/')
+            if rel_path in PACK_EXCLUDE_PATHS:
+                continue
+            all_files.append((rel_path, full_path))
+            
+    all_files.sort()
+    
+    for rel_path, full_path in all_files:
+        size = os.path.getsize(full_path)
+        is_unpacked = rel_path in unpacked_paths
+        
+        entry = {}
+        entry["size"] = size
+        entry["integrity"] = compute_integrity(full_path)
+        if is_unpacked:
+            entry["unpacked"] = True
+            
+            dest_unpacked_file = os.path.join(unpacked_dir, os.path.normpath(rel_path))
+            os.makedirs(os.path.dirname(dest_unpacked_file), exist_ok=True)
+            shutil.copy2(full_path, dest_unpacked_file)
+        else:
+            with open(full_path, 'rb') as f:
+                data = f.read()
+            payload_file.write(data)
+            entry["offset"] = str(current_offset)
+            current_offset += size
+            
+        parts = rel_path.split('/')
+        current_node = header
+        for part in parts[:-1]:
+            if "files" not in current_node:
+                current_node["files"] = {}
+            if part not in current_node["files"]:
+                current_node["files"][part] = {"files": {}}
+            current_node = current_node["files"][part]
+            
+        if "files" not in current_node:
+            current_node["files"] = {}
+        current_node["files"][parts[-1]] = entry
+        
+    return header
+
+def pack_asar(source_dir, asar_path, reference_asar_path=None):
+    print(f"  [*] Packing '{source_dir}' to '{os.path.basename(asar_path)}'...")
+    
+    unpacked_paths = get_unpacked_paths(reference_asar_path or asar_path)
+    if unpacked_paths:
+        print(f"  [*] Found {len(unpacked_paths)} unpacked files to preserve.")
+        
+    unpacked_dir = asar_path + '.unpacked'
+    if os.path.exists(unpacked_dir):
+        try:
+            shutil.rmtree(unpacked_dir)
+        except Exception as e:
+            print(f"  [!] Warning: Could not clear old unpacked directory: {e}")
+    os.makedirs(unpacked_dir, exist_ok=True)
+    
+    temp_payload_fd, temp_payload_path = tempfile.mkstemp()
+    try:
+        with os.fdopen(temp_payload_fd, 'wb') as payload_file:
+            header = build_asar_tree(source_dir, unpacked_paths, payload_file, unpacked_dir)
+            
+        json_bytes = json.dumps(header, separators=(',', ':')).encode('utf-8')
+        json_size = len(json_bytes)
+        json_payload_size = align_to(json_size + 4, 4)
+        json_padding_size = json_payload_size - (json_size + 4)
+        header_size = json_payload_size + 4
+        pickle_header = 4
+        
+        temp_asar_fd, temp_asar_path = tempfile.mkstemp(dir=os.path.dirname(asar_path))
+        try:
+            with os.fdopen(temp_asar_fd, 'wb') as out_f:
+                out_f.write(struct.pack('<I', pickle_header))
+                out_f.write(struct.pack('<I', header_size))
+                out_f.write(struct.pack('<I', json_payload_size))
+                out_f.write(struct.pack('<I', json_size))
+                out_f.write(json_bytes)
+                if json_padding_size:
+                    out_f.write(b'\0' * json_padding_size)
+                
+                with open(temp_payload_path, 'rb') as pay_f:
+                    shutil.copyfileobj(pay_f, out_f)
+            
+            if os.path.exists(asar_path):
+                try:
+                    os.remove(asar_path)
+                except PermissionError:
+                    temp_old_path = asar_path + ".old"
+                    if os.path.exists(temp_old_path):
+                        try:
+                            os.remove(temp_old_path)
+                        except Exception:
+                            pass
+                    try:
+                        os.rename(asar_path, temp_old_path)
+                        print(f"  [*] Locked file renamed to {os.path.basename(temp_old_path)}")
+                    except Exception as e:
+                        print(f"  [!] Error: Could not overwrite or rename '{asar_path}' (locked by another process). {e}")
+                        return False
+
+            shutil.move(temp_asar_path, asar_path)
+            print("  [+] Packing completed successfully.")
+            
+            if os.path.exists(unpacked_dir) and not os.listdir(unpacked_dir):
+                os.rmdir(unpacked_dir)
+                
+            return True
+        finally:
+            if os.path.exists(temp_asar_path):
+                try:
+                    os.remove(temp_asar_path)
+                except Exception:
+                    pass
+    finally:
+        if os.path.exists(temp_payload_path):
+            try:
+                os.remove(temp_payload_path)
+            except Exception:
+                pass
+    return False
+
+def patch_antigravity_main_js(dest_folder, rollback=False):
+    main_js_path = os.path.join(dest_folder, 'dist', 'main.js')
+    backup_path = main_js_path + '.bak'
+    
+    if not os.path.exists(main_js_path):
+        print(f"  [!] Error: main.js not found at {main_js_path}")
+        return False
+
+    with open(main_js_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    escaped_dest_folder = dest_folder.replace("\\", "/")
+    injection_code = ANTIGRAVITY_INJECTION_CODE_TEMPLATE.replace("{dest_folder}", escaped_dest_folder)
+
+    if rollback:
+        if injection_code in content:
+            patched_content = content.replace(injection_code, "")
+            with open(main_js_path, 'w', encoding='utf-8') as f:
+                f.write(patched_content)
+            print("  [+] Successfully rolled back patch by removing the injected lines directly.")
+            return True
+        elif os.path.exists(backup_path):
+            shutil.copy2(backup_path, main_js_path)
+            print("  [+] Successfully rolled back patch using the backup file (main.js.bak).")
+            return True
+        else:
+            print("  [!] Patch not found in main.js and backup file does not exist.")
+            return False
+
+    if not os.path.exists(backup_path):
+        shutil.copy2(main_js_path, backup_path)
+        print("  [*] Created backup of original main.js inside temp folder.")
+
+    target_str = "(0, ipcHandlers_1.registerIpcHandlers)(storageManager);"
+    if "patchFrontendMainJs" in content:
+        print("  [i] Patch already applied to main.js.")
+        return True
+    if "downloaded_frontend_main.js" in content and os.path.exists(backup_path):
+        with open(backup_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        print("  [i] Found old download-only patch; restored backup content before applying frontend patch proxy.")
+
+    if target_str not in content:
+        print(f"  [!] Error: Target line '{target_str}' not found in main.js")
+        return False
+
+    patched_content = content.replace(target_str, target_str + injection_code)
+    
+    with open(main_js_path, 'w', encoding='utf-8') as f:
+        f.write(patched_content)
+        
+    print("  [+] Successfully patched main.js inside extracted ASAR.")
+    return True
+
+def find_antigravity_root():
+    candidates = []
+
+    if sys.platform == "darwin":
+        mac_candidates = [
+            "/Applications/Antigravity.app",
+            os.path.expanduser("~/Applications/Antigravity.app"),
+        ]
+        for app in mac_candidates:
+            if os.path.exists(app):
+                candidates.append(app)
+    elif os.name == "posix":
+        candidates.extend([
+            "/usr/share/antigravity",
+            "/opt/Antigravity",
+            "/opt/antigravity",
+        ])
+
+    if os.name == "nt":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(os.path.join(local_app_data, "Programs", "Antigravity"))
+            candidates.append(os.path.join(local_app_data, "Programs", "antigravity"))
+        pf = os.environ.get("PROGRAMFILES")
+        if pf:
+            candidates.append(os.path.join(pf, "Antigravity"))
+        pfx86 = os.environ.get("PROGRAMFILES(X86)")
+        if pfx86:
+            candidates.append(os.path.join(pfx86, "Antigravity"))
+
+        try:
+            import winreg
+            hives = [
+                (winreg.HKEY_CURRENT_USER, 'HKCU'),
+                (winreg.HKEY_LOCAL_MACHINE, 'HKLM')
+            ]
+            subkeys = [
+                r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                r'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+            ]
+            for hive, hname in hives:
+                for subkey in subkeys:
+                    try:
+                        with winreg.OpenKey(hive, subkey) as key:
+                            info = winreg.QueryInfoKey(key)
+                            for i in range(info[0]):
+                                try:
+                                    name = winreg.EnumKey(key, i)
+                                    with winreg.OpenKey(key, name) as sub:
+                                        disp = ''
+                                        try:
+                                            disp, _ = winreg.QueryValueEx(sub, 'DisplayName')
+                                        except OSError:
+                                            pass
+                                        
+                                        disp_lower = disp.lower()
+                                        name_lower = name.lower()
+                                        if ('antigravity' in disp_lower or 'antigravity' in name_lower) and \
+                                           'ide' not in disp_lower and 'ide' not in name_lower and \
+                                           'tools' not in disp_lower and 'tools' not in name_lower:
+                                            
+                                            try:
+                                                icon_val, _ = winreg.QueryValueEx(sub, 'DisplayIcon')
+                                                if icon_val:
+                                                    icon_path = icon_val.split(',')[0].strip().strip('"')
+                                                    if icon_path:
+                                                        candidates.append(os.path.dirname(icon_path))
+                                            except OSError:
+                                                pass
+
+                                            try:
+                                                uninst_val, _ = winreg.QueryValueEx(sub, 'UninstallString')
+                                                if uninst_val:
+                                                    uninst_path = uninst_val.split('.exe')[0].strip().strip('"')
+                                                    if uninst_path:
+                                                        candidates.append(os.path.dirname(uninst_path + '.exe'))
+                                            except OSError:
+                                                pass
+                                except OSError:
+                                    pass
+                    except OSError:
+                        pass
+        except ImportError:
+            pass
+
+    for path in candidates:
+        path = os.path.abspath(path)
+        if os.path.exists(os.path.join(path, "resources", "app.asar")) or \
+           os.path.exists(os.path.join(path, "resources", "app1.asar")):
+            return path
+        if sys.platform == "darwin" and path.endswith(".app"):
+            resources_path = os.path.join(path, "Contents", "Resources")
+            if os.path.exists(os.path.join(resources_path, "app.asar")) or \
+               os.path.exists(os.path.join(resources_path, "app1.asar")):
+                return path
+
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+
+    return ""
+
+def resolve_antigravity_paths(root):
+    if sys.platform == "darwin" and root.endswith(".app"):
+        asar = os.path.join(root, "Contents", "Resources", "app.asar")
+        if not os.path.exists(asar):
+            asar = os.path.join(root, "Contents", "Resources", "app1.asar")
+        exe = os.path.join(root, "Contents", "MacOS", "Antigravity")
+        return asar, exe
+
+    asar = os.path.join(root, "resources", "app.asar")
+    if not os.path.exists(asar):
+        asar = os.path.join(root, "resources", "app1.asar")
+    
+    exe_name = "Antigravity"
+    if os.name == "nt":
+        exe_name += ".exe"
+    exe = os.path.join(root, exe_name)
+    return asar, exe
+
+def is_antigravity_patched(asar_path):
+    if not os.path.exists(asar_path):
+        return False
+    try:
+        with open(asar_path, 'rb') as f:
+            while True:
+                chunk = f.read(1024 * 1024)
+                if not chunk:
+                    break
+                if b"patchFrontendMainJs" in chunk:
+                    return True
+        return False
+    except Exception:
+        return False
+
+def read_package_json_from_asar(asar_path):
+    if not os.path.exists(asar_path):
+        return None
+    try:
+        with open(asar_path, 'rb') as f:
+            pickle_header = struct.unpack('<I', f.read(4))[0]
+            header_size = struct.unpack('<I', f.read(4))[0]
+            json_size_plus_4 = struct.unpack('<I', f.read(4))[0]
+            json_size = struct.unpack('<I', f.read(4))[0]
+            json_bytes = f.read(json_size)
+            header = json.loads(json_bytes.decode('utf-8'))
+            
+            files = header.get('files', {})
+            pkg_entry = files.get('package.json')
+            if pkg_entry and 'offset' in pkg_entry and 'size' in pkg_entry:
+                offset = int(pkg_entry['offset'])
+                size = pkg_entry['size']
+                payload_offset = 8 + header_size
+                f.seek(payload_offset + offset)
+                data = f.read(size)
+                pkg_data = json.loads(data.decode('utf-8'))
+                return pkg_data.get('version')
+    except Exception:
+        pass
+    return None
+
+def do_patch_antigravity(antigravity_root):
+    if not antigravity_root or not os.path.isdir(antigravity_root):
+        print(color(f"  [!] Antigravity root path not found: {antigravity_root}", COLOR_RED))
+        return
+
+    asar_path, exe_path = resolve_antigravity_paths(antigravity_root)
+    if not os.path.exists(asar_path):
+        print(color(f"  [!] ASAR file not found: {asar_path}", COLOR_RED))
+        return
+
+    if is_antigravity_patched(asar_path):
+        print("  [i] Antigravity appears already patched.")
+        if not confirmed("Apply patch anyway?"):
+            return
+
+    source_asar_path = asar_path + ".bak"
+    legacy_backup = os.path.join(os.path.dirname(asar_path), "app_original.asar")
+    if os.path.exists(legacy_backup) and not os.path.exists(source_asar_path):
+        source_asar_path = legacy_backup
+
+    if not os.path.exists(source_asar_path):
+        print("  [*] Creating backup of original ASAR...")
+        try:
+            shutil.copy2(asar_path, source_asar_path)
+            print(f"  [+] Backup: {os.path.basename(source_asar_path)} ({format_bytes(file_size(source_asar_path))})")
+        except Exception as e:
+            print(color(f"  [!] Backup error: {e}", COLOR_RED))
+            return
+    else:
+        print(f"  [i] Backup of original ASAR already exists: {os.path.basename(source_asar_path)}")
+
+    temp_dir = os.environ.get("TEMP")
+    if not temp_dir:
+        temp_dir = os.path.join(os.environ.get("LOCALAPPDATA"), "Temp")
+    dest_folder = os.path.join(temp_dir, "ag_patcher_temp")
+
+    if os.path.exists(dest_folder):
+        try:
+            shutil.rmtree(dest_folder)
+        except Exception:
+            pass
+    os.makedirs(dest_folder, exist_ok=True)
+
+    print("  [*] Extracting ASAR archive...")
+    success = extract_asar(source_asar_path, dest_folder)
+    if not success:
+        print(color("  [!] Extraction failed.", COLOR_RED))
+        return
+
+    print("  [*] Modifying files...")
+    if patch_antigravity_main_js(dest_folder, rollback=False):
+        print("  [*] Packing ASAR archive...")
+        if pack_asar(dest_folder, asar_path, reference_asar_path=source_asar_path):
+            print(color("  [+] Antigravity app.asar patched successfully!", COLOR_GREEN))
+            resign_macos_bundle(asar_path)
+            
+            if os.path.exists(exe_path):
+                print(f"  [*] Launching application to verify: {exe_path}")
+                target_file = os.path.join(dest_folder, "frontend_patch_result.json")
+                if os.path.exists(target_file):
+                    try:
+                        os.remove(target_file)
+                    except Exception:
+                        pass
+                
+                try:
+                    process = subprocess.Popen([exe_path], cwd=antigravity_root)
+                    print("  [*] Waiting for frontend_patch_result.json to be written...")
+                    
+                    start_time = time.time()
+                    timeout = 120
+                    patched = False
+                    
+                    while time.time() - start_time < timeout:
+                        if os.path.exists(target_file) and os.path.getsize(target_file) > 0:
+                            patched = True
+                            break
+                        time.sleep(0.5)
+                        
+                    if patched:
+                        print(color(f"  [+] Frontend patch result verified: {target_file}", COLOR_GREEN))
+                    else:
+                        print(color("  [!] Timeout: frontend_patch_result.json was not written.", COLOR_YELLOW))
+                        print("  [i] The patch was applied, but verification timed out. You may need to sign in manually.")
+                        
+                    print("  [*] Stopping the application...")
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        print("  [!] Forcing application to stop...")
+                        process.kill()
+                        process.wait()
+                except Exception as e:
+                    print(color(f"  [!] Error launching/stopping application: {e}", COLOR_YELLOW))
+            else:
+                print(color(f"  [!] Executable not found at {exe_path}. Cannot auto-verify.", COLOR_YELLOW))
+        else:
+            print(color("  [!] Packing failed.", COLOR_RED))
+    else:
+        print(color("  [!] Patching main.js failed.", COLOR_RED))
+
+def do_restore_antigravity(antigravity_root):
+    if not antigravity_root or not os.path.isdir(antigravity_root):
+        print(color(f"  [!] Antigravity root path not found: {antigravity_root}", COLOR_RED))
+        return
+
+    asar_path, exe_path = resolve_antigravity_paths(antigravity_root)
+    source_asar_path = asar_path + ".bak"
+    legacy_backup = os.path.join(os.path.dirname(asar_path), "app_original.asar")
+    if os.path.exists(legacy_backup) and not os.path.exists(source_asar_path):
+        source_asar_path = legacy_backup
+
+    if not os.path.exists(source_asar_path):
+        print(color(f"  [!] Original ASAR backup not found: {source_asar_path}", COLOR_RED))
+        print("  [*] Attempting in-place rollback by extracting and patching...")
+        if not os.path.exists(asar_path):
+            print(color(f"  [!] Target ASAR file not found: {asar_path}", COLOR_RED))
+            return
+            
+        temp_dir = os.environ.get("TEMP")
+        if not temp_dir:
+            temp_dir = os.path.join(os.environ.get("LOCALAPPDATA"), "Temp")
+        dest_folder = os.path.join(temp_dir, "ag_patcher_temp")
+
+        if os.path.exists(dest_folder):
+            try:
+                shutil.rmtree(dest_folder)
+            except Exception:
+                pass
+        os.makedirs(dest_folder, exist_ok=True)
+
+        print("  [*] Extracting ASAR...")
+        if not extract_asar(asar_path, dest_folder):
+            print(color("  [!] Extraction failed.", COLOR_RED))
+            return
+
+        print("  [*] Performing rollback in main.js...")
+        if patch_antigravity_main_js(dest_folder, rollback=True):
+            print("  [*] Packing ASAR...")
+            if pack_asar(dest_folder, asar_path):
+                print(color("  [+] Antigravity rollback completed successfully!", COLOR_GREEN))
+                resign_macos_bundle(asar_path)
+            else:
+                print(color("  [!] Packing failed.", COLOR_RED))
+        else:
+            print(color("  [!] Rollback failed (patch not found or backup missing).", COLOR_RED))
+        return
+
+    print(f"  [*] Found original ASAR backup: {os.path.basename(source_asar_path)}")
+    if not confirmed("Restore original ASAR from backup?"):
+        return
+
+    try:
+        if os.path.exists(asar_path):
+            try:
+                os.remove(asar_path)
+            except PermissionError:
+                temp_old_path = asar_path + ".old"
+                if os.path.exists(temp_old_path):
+                    try:
+                        os.remove(temp_old_path)
+                    except Exception:
+                        pass
+                os.rename(asar_path, temp_old_path)
+        
+        shutil.copy2(source_asar_path, asar_path)
+        print(color("  [+] Restored original ASAR from backup!", COLOR_GREEN))
+        resign_macos_bundle(asar_path)
+        print(f"  [i] Backup file {os.path.basename(source_asar_path)} was kept.")
+    except Exception as e:
+        print(color(f"  [!] Failed to restore backup: {e}", COLOR_RED))
+
+def assign_custom_path(raw_path):
+    resolved = resolve_target_path(raw_path)
+    if not os.path.exists(resolved):
+        return None, None
+        
+    if os.path.isfile(resolved) and resolved.endswith("main.js"):
+        return resolved, None
+        
+    asar_path, _ = resolve_antigravity_paths(resolved)
+    if os.path.exists(asar_path):
+        return None, resolved
+        
+    main_js = find_main_js(resolved)
+    if main_js:
+        return main_js, None
+        
+    if os.path.isfile(resolved):
+        return resolved, None
+    else:
+        return None, resolved
+
+
+# ---------------------------------------------------------------------------
 # Точка входа
 # ---------------------------------------------------------------------------
 
@@ -1156,57 +2002,55 @@ def main():
     print_banner()
 
     main_js_path = ""
-    
+    antigravity_root = ""
+    searched = False
+
     # 1. Проверяем аргументы командной строки
     if len(sys.argv) > 1:
-        arg = " ".join(sys.argv[1:])
-        main_js_path = resolve_target_path(arg)
-        if not os.path.exists(main_js_path):
-            print(color(f"  [!] Provided path does not exist: {main_js_path}", COLOR_RED))
-            main_js_path = ""
+        args = [a for a in sys.argv[1:] if a not in ("--rollback", "-r")]
+        if args:
+            arg = " ".join(args)
+            main_js_path, antigravity_root = assign_custom_path(arg)
+            if not main_js_path and not antigravity_root:
+                print(color(f"  [!] Provided path does not exist or invalid: {arg}", COLOR_RED))
 
-    # 2. Проверяем текущую директорию
-    if not main_js_path:
+    # 2. Проверяем текущую директорию (для Antigravity IDE)
+    if not main_js_path and not antigravity_root:
         local = os.path.join(os.getcwd(), "main.js")
         if os.path.exists(local):
             main_js_path = local
             print("  [*] Found main.js in current directory")
 
     # 3. Авто-поиск в системе
-    searched = False
-    if not main_js_path:
-        print("  [*] Searching for Antigravity IDE installation...")
+    if not main_js_path and not antigravity_root:
+        print("  [*] Searching for installations...")
         searched = True
-        root = find_install_root()
-        if root:
-            main_js_path = find_main_js(root)
+        
+        ide_root = find_install_root()
+        if ide_root:
+            main_js_path = find_main_js(ide_root)
+            
+        antigravity_root = find_antigravity_root()
 
-    # Если ничего не нашли, просим ввести вручную сразу
-    if not main_js_path:
-        print(color("  [!] Antigravity IDE installation not found automatically.", COLOR_YELLOW))
-        print("  [i] Please specify the path to Antigravity IDE or main.js.")
+    # Если ничего не нашли вообще, просим ввести вручную сразу
+    if not main_js_path and not antigravity_root:
+        print(color("  [!] No installations found automatically.", COLOR_YELLOW))
+        print("  [i] Please specify the path to Antigravity IDE, Antigravity, or main.js.")
         print_path_examples()
         raw = input(color("\n  Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
         if raw:
-            main_js_path = resolve_target_path(raw)
+            main_js_path, antigravity_root = assign_custom_path(raw)
 
-    if not main_js_path or not os.path.exists(main_js_path):
-        clear_screen()
-        print_banner()
-        print(color("  [!] Target file not found.", COLOR_RED))
-        print()
-        print_launch_examples()
-        input("\n  Press Enter to exit...")
-        return
-
-    redraw_main_screen(main_js_path, show_search_line=searched)
+    redraw_main_screen(main_js_path, antigravity_root, show_search_line=searched)
 
     while True:
-        print(color("  1. Apply patch", COLOR_GREEN))
-        print(color("  2. Restore from backup", COLOR_YELLOW))
-        print(color("  3. Fix HTTP 429 (Too Many Requests)", COLOR_CYAN))
-        print(color("  4. Open GitHub repository", COLOR_CYAN))
-        print(color("  5. Select custom main.js path", COLOR_CYAN))
+        print(color("  1. Apply Antigravity IDE patch", COLOR_GREEN))
+        print(color("  2. Apply Antigravity patch", COLOR_GREEN))
+        print(color("  3. Restore Antigravity IDE from backup", COLOR_YELLOW))
+        print(color("  4. Restore Antigravity from backup", COLOR_YELLOW))
+        print(color("  5. Fix HTTP 429 (Too Many Requests)", COLOR_CYAN))
+        print(color("  6. Open GitHub repository", COLOR_CYAN))
+        print(color("  7. Select custom path", COLOR_CYAN))
         print(color("  0. Exit", COLOR_RED))
 
         choice = input(color("\n  > ", COLOR_CYAN, COLOR_BOLD)).strip()
@@ -1220,29 +2064,46 @@ def main():
         print_banner()
 
         if choice == "1":
-            do_patch(main_js_path, show_search_line=searched)
+            if main_js_path:
+                do_patch(main_js_path, show_search_line=searched)
+            else:
+                print(color("  [!] Antigravity IDE path is not set. Please select custom path (Option 7) first.", COLOR_RED))
         elif choice == "2":
-            do_restore(main_js_path, show_search_line=searched)
+            if antigravity_root:
+                do_patch_antigravity(antigravity_root)
+            else:
+                print(color("  [!] Antigravity path is not set. Please select custom path (Option 7) first.", COLOR_RED))
         elif choice == "3":
-            do_fix_429()
+            if main_js_path:
+                do_restore(main_js_path, show_search_line=searched)
+            else:
+                print(color("  [!] Antigravity IDE path is not set. Please select custom path (Option 7) first.", COLOR_RED))
         elif choice == "4":
-            print_target_info(main_js_path, show_search_line=searched)
+            if antigravity_root:
+                do_restore_antigravity(antigravity_root)
+            else:
+                print(color("  [!] Antigravity path is not set. Please select custom path (Option 7) first.", COLOR_RED))
+        elif choice == "5":
+            do_fix_429()
+        elif choice == "6":
+            print_target_info(main_js_path, antigravity_root, show_search_line=searched)
             print()
             url = "https://github.com/AvenCores/open-antigravity-unlock"
             webbrowser.open(url)
             print(f"  [+] Opening: {color(url, COLOR_CYAN)}")
-        elif choice == "5":
-            print("  [i] Enter the path to Antigravity IDE folder or main.js file.")
+        elif choice == "7":
+            print("  [i] Enter the path to Antigravity IDE folder, Antigravity folder, or main.js file.")
             print_path_examples()
             raw = input(color("\n  Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
             if raw:
-                new_path = resolve_target_path(raw)
-                if os.path.exists(new_path):
-                    main_js_path = new_path
-                    searched = False # Мы теперь знаем точный путь
-                    print(color(f"  [+] Target updated to: {main_js_path}", COLOR_GREEN))
+                new_main_js, new_ag_root = assign_custom_path(raw)
+                if new_main_js or new_ag_root:
+                    main_js_path = new_main_js if new_main_js else ""
+                    antigravity_root = new_ag_root if new_ag_root else ""
+                    searched = False
+                    print(color("  [+] Target paths updated successfully!", COLOR_GREEN))
                 else:
-                    print(color(f"  [!] Path does not exist: {new_path}", COLOR_RED))
+                    print(color("  [!] Could not resolve a valid target from the provided path.", COLOR_RED))
             handled = True
         else:
             handled = False
@@ -1251,7 +2112,7 @@ def main():
 
         if handled:
             pause()
-            redraw_main_screen(main_js_path, show_search_line=searched)
+            redraw_main_screen(main_js_path, antigravity_root, show_search_line=searched)
 
 
 if __name__ == "__main__":
@@ -1265,8 +2126,6 @@ if __name__ == "__main__":
         print("  [!] Root access is required to patch files in /usr/share/antigravity-ide.")
         if confirmed("Re-launch with sudo?"):
             try:
-                # В PyInstaller bundle (frozen) sys.executable и sys.argv[0] — это путь к бинарнику.
-                # Чтобы не дублировать путь в аргументах, передаем только sys.argv[1:].
                 if getattr(sys, "frozen", False):
                     args = ["sudo", sys.executable] + sys.argv[1:]
                 else:
