@@ -1,4 +1,5 @@
 import os
+import json
 import shutil
 import subprocess
 import tempfile
@@ -179,15 +180,28 @@ def do_patch_antigravity(antigravity_root):
                     start_time = time.time()
                     timeout = 120
                     patched = False
+                    verification = None
                     
                     while time.time() - start_time < timeout:
                         if os.path.exists(target_file) and os.path.getsize(target_file) > 0:
                             patched = True
+                            try:
+                                with open(target_file, "r", encoding="utf-8") as f:
+                                    verification = json.load(f)
+                            except Exception:
+                                verification = None
                             break
                         time.sleep(0.5)
                         
-                    if patched:
+                    if patched and isinstance(verification, dict) and verification.get("verified"):
                         print(color(f"  [+] Frontend patch result verified: {target_file}", COLOR_GREEN))
+                    elif patched:
+                        print(color(f"  [!] Frontend patch result was written but verification failed: {target_file}", COLOR_YELLOW))
+                        if isinstance(verification, dict):
+                            for result in verification.get("results", []):
+                                status = "applied" if result.get("applied") else "not applied"
+                                detail = result.get("detail", "")
+                                print(f"      - {result.get('name', 'patch')}: {status}; {detail}")
                     else:
                         print(color("  [!] Timeout: frontend_patch_result.json was not written.", COLOR_YELLOW))
                         print("  [i] The patch was applied, but verification timed out. You may need to sign in manually.")

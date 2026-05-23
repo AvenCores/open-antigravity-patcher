@@ -1,6 +1,7 @@
 import os
 import sys
 import webbrowser
+import locale
 
 from patcher.constants import (
     VERSION,
@@ -37,29 +38,63 @@ def pause():
 def print_launch_examples():
     script_name = os.path.basename(sys.argv[0]) or "main.py"
     cmd = script_name if getattr(sys, "frozen", False) else f"python {script_name}"
+    windows_example = f'{cmd} "C:\\Path\\To\\Antigravity IDE"'
+    macos_example = f'{cmd} "/Applications/Antigravity IDE.app"'
+    linux_example = f'{cmd} "/usr/share/antigravity-ide"'
 
     print(f"  [i] Usage examples with custom path:")
-    print(f"      Windows: {color(f'{cmd} \"C:\\Path\\To\\Antigravity IDE\"', COLOR_YELLOW)}")
-    print(f"      macOS:   {color(f'{cmd} \"/Applications/Antigravity IDE.app\"', COLOR_YELLOW)}")
-    print(f"      Linux:   {color(f'{cmd} \"/usr/share/antigravity-ide\"', COLOR_YELLOW)}")
+    print(f"      Windows: {color(windows_example, COLOR_YELLOW)}")
+    print(f"      macOS:   {color(macos_example, COLOR_YELLOW)}")
+    print(f"      Linux:   {color(linux_example, COLOR_YELLOW)}")
 
 
 def print_path_examples():
-    print(f"  [i] Path examples:")
-    print(f"      Windows: {color(r'C:\\Users\\Name\\AppData\\Local\\Programs\\Antigravity IDE', COLOR_YELLOW)}")
-    print(f"      macOS:   {color('/Applications/Antigravity IDE.app', COLOR_YELLOW)}")
-    print(f"      Linux:   {color('/usr/share/antigravity-ide', COLOR_YELLOW)}")
+    windows_path = r"C:\Users\Name\AppData\Local\Programs\Antigravity IDE"
+    macos_path = "/Applications/Antigravity IDE.app"
+    linux_path = "/usr/share/antigravity-ide"
+
+    print("  [i] Path examples:")
+    print(f"      Windows: {color(windows_path, COLOR_YELLOW)}")
+    print(f"      macOS:   {color(macos_path, COLOR_YELLOW)}")
+    print(f"      Linux:   {color(linux_path, COLOR_YELLOW)}")
+
+
+def _read_console_line(prompt):
+    print(prompt, end="", flush=True)
+
+    stdin_buffer = getattr(sys.stdin, "buffer", None)
+    if stdin_buffer is None:
+        return sys.stdin.readline().rstrip("\r\n")
+
+    raw = stdin_buffer.readline()
+    if not raw:
+        return ""
+
+    encodings = [
+        sys.stdin.encoding,
+        locale.getpreferredencoding(False),
+        "utf-8",
+        "cp1251",
+        "latin-1",
+    ]
+    for encoding in [e for e in encodings if e]:
+        try:
+            return raw.decode(encoding).rstrip("\r\n")
+        except UnicodeDecodeError:
+            pass
+
+    return raw.decode("utf-8", errors="replace").rstrip("\r\n")
 
 
 def prompt_yn(question):
     question = question.rstrip()
     prompt = f"  [?] {question} ({color('y', COLOR_GREEN)}/{color('n', COLOR_RED)}): "
-    return input(prompt).strip().lower()
+    return _read_console_line(prompt).strip().lower()
 
 
 def confirmed(question):
     """Возвращает True, если пользователь ответил 'y'."""
-    return prompt_yn(question) == "y"
+    return prompt_yn(question) in ("y", "yes", "\u0434", "\u0434\u0430")
 
 
 def print_target_info(main_js_path, antigravity_root="", show_search_line=False):

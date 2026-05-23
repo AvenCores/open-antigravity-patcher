@@ -163,6 +163,25 @@ python3 main.py /Applications/Antigravity.app
 
 > **macOS:** если `Antigravity IDE.app` лежит в `/Applications`, запись потребует `sudo` (скрипт сам предложит перезапуск). Для установки в `~/Applications` или пользовательскую директорию `sudo` не нужен. После успешного патча `.app` автоматически переподписывается ad-hoc подписью (`codesign --force --deep --sign -`) — без этого Electron с Hardened Runtime не запустится на macOS.
 
+### 🍎 Готовая macOS-сборка
+
+Готовый `universal2`-бинарник для Intel и Apple Silicon доступен в форке coneldiablo:
+
+- Release: [Open AG Patcher 1.1.5 macOS universal2 build 2](https://github.com/coneldiablo/open-antigravity-patcher/releases/tag/v1.1.5-macos-universal2.2)
+- Оригинальный upstream и история автора сохранены через fork: [AvenCores/open-antigravity-patcher](https://github.com/AvenCores/open-antigravity-patcher)
+- Подробная инструкция: [MACOS_USAGE.md](./MACOS_USAGE.md)
+
+Быстрый запуск:
+
+```bash
+cd ~/Downloads
+unzip Open_AG_Patcher_macOS-universal2.zip
+chmod +x Open_AG_Patcher_macOS
+sudo ./Open_AG_Patcher_macOS
+```
+
+В меню выберите `2. Apply Antigravity patch` для standalone `Antigravity.app` или `1. Apply Antigravity IDE patch` для `Antigravity IDE.app`.
+
 ## ❓ Что именно меняется
 
 ### Патч для Antigravity IDE

@@ -89,8 +89,13 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
     };
     const isFrontendMainPatched = (content) => {
         if (content.includes('csrfToken') && content.includes('isGoogleInternal')) {
-            return !content.includes('isGoogleInternal:!1')
-                && content.includes('SET_INELIGIBLE:{target:".signedIn"}');
+            const internalPatched = !content.includes('isGoogleInternal:!1')
+                && content.includes('isGoogleInternal:!0');
+            const loginRedirectPatched = !content.includes('SET_INELIGIBLE:{target:".loginError"')
+                && !content.includes('SET_ERROR:{target:".loginError"')
+                && (content.includes('SET_INELIGIBLE:{target:".signedIn"')
+                    || content.includes('SET_ERROR:{target:".signedIn"'));
+            return internalPatched && loginRedirectPatched;
         }
         return false;
     };

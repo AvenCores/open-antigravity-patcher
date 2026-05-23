@@ -4,5 +4,5 @@ pyinstaller --onefile --uac-admin --icon=icon.ico --name="Open_AG_Patcher_Window
 Linux:
 pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
 
-macOS:
-pyinstaller --onefile --name="Open_AG_Patcher_macOS" --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
+macOS universal2:
+pyinstaller --onefile --name="Open_AG_Patcher_macOS" --target-arch universal2 --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
