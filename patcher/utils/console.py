@@ -53,8 +53,8 @@ def print_banner():
     )
     print(
         color("  ║  ", COLOR_CYAN, COLOR_BOLD)
-        + color("Region bypass for Antigravity IDE", COLOR_CYAN)
-        + color("            ║", COLOR_CYAN, COLOR_BOLD)
+        + color("Region bypass for Antigravity", COLOR_CYAN)
+        + color("                ║", COLOR_CYAN, COLOR_BOLD)
     )
     print(
         color("  ║  ", COLOR_CYAN, COLOR_BOLD)
