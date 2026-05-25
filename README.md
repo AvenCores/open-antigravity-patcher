@@ -119,7 +119,7 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 - Применение и откат патча через простое меню.
 - Поддержка путей `resources/app/out/main.js` и `resources/app/main.js`.
 - Цветной вывод и попытка автоматического повышения прав (UAC на Windows, предложение `sudo` на Linux).
-- Проверка минимальной версии Antigravity IDE (>= `1.22.2`) перед применением патча.
+- Проверка минимальной версии Antigravity IDE (>= `2.0.1`) перед применением патча.
 - Определение версии Antigravity IDE через реестр Windows, пакетный менеджер на Linux или `package.json` на macOS.
 - Обнаружение уже применённого патча с предложением применить повторно.
 - Временный runtime workaround для Antigravity IDE `1.23+`: фиксация стабильного Cloud Code endpoint и отключение проблемных Cascade/model experiments через `settings.json`.
@@ -385,8 +385,8 @@ xcode-select --install
   - **Windows** — полная поддержка автопоиска через реестр и UAC.
   - **Linux** — автопоиск в `/usr/share/antigravity-ide`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
   - **macOS** — автопоиск в `/Applications/Antigravity IDE.app` и `~/Applications/Antigravity IDE.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
-- **Минимальная версия Antigravity**: `1.22.2`
-- **Поддерживаемые версии**: `1.22.2` и выше (с версионным выбором auth-паттерна для `1.23+`)
+- **Минимальная версия Antigravity**: `2.0.1`
+- **Поддерживаемые версии**: `2.0.1` и выше (с версионным выбором auth-паттерна для `1.23+`)
 
 ## 🛠️ Сборка
 
