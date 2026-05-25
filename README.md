@@ -164,24 +164,67 @@ python3 main.py /Applications/Antigravity.app
 
 > **macOS:** если `Antigravity IDE.app` лежит в `/Applications`, запись потребует `sudo` (скрипт сам предложит перезапуск). Для установки в `~/Applications` или пользовательскую директорию `sudo` не нужен. После успешного патча `.app` автоматически переподписывается ad-hoc подписью (`codesign --force --deep --sign -`) — без этого Electron с Hardened Runtime не запустится на macOS.
 
-### 🍎 Готовая macOS-сборка
+### 🍎 Использование на macOS
 
-Готовый `universal2`-бинарник для Intel и Apple Silicon доступен в форке coneldiablo:
+Поскольку готовые бинарные сборки для macOS отсутствуют в официальных релизах (доступны только для Windows и Linux), вы можете либо запускать патчер напрямую из исходного кода, либо собрать исполняемый файл самостоятельно.
 
-- Release: [Open AG Patcher 1.1.5 macOS universal2 build 2](https://github.com/coneldiablo/open-antigravity-patcher/releases/tag/v1.1.5-macos-universal2.2)
-- Оригинальный upstream и история автора сохранены через fork: [AvenCores/open-antigravity-patcher](https://github.com/AvenCores/open-antigravity-patcher)
-- Подробная инструкция: [MACOS_USAGE.md](./MACOS_USAGE.md)
+#### Вариант 1: Запуск из исходного кода (рекомендуется)
+1. Создайте виртуальное окружение, активируйте его и установите необходимые зависимости:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. Полностью закройте Antigravity или Antigravity IDE.
+3. Запустите патчер, указав путь к приложению:
+   ```bash
+   # Для Antigravity IDE
+   python3 main.py "/Applications/Antigravity IDE.app"
+   
+   # Для standalone-версии Antigravity
+   python3 main.py "/Applications/Antigravity.app"
+   ```
+   *Примечание: Если приложение находится в папке `/Applications`, скрипт автоматически запросит повышение прав (`sudo`) для записи.*
 
-Быстрый запуск:
+#### Вариант 2: Самостоятельная сборка бинарного файла
+Если вам необходим готовый исполняемый файл, вы можете собрать его самостоятельно, следуя инструкции в разделе [🛠️ Сборка](#%EF%B8%8F-сборка).
 
+После успешной сборки запуск скомпилированного файла выполняется через Терминал:
 ```bash
-cd ~/Downloads
-unzip Open_AG_Patcher_macOS-universal2.zip
+cd dist
 chmod +x Open_AG_Patcher_macOS
 sudo ./Open_AG_Patcher_macOS
 ```
+Если macOS блокирует запуск скомпилированного файла, снимите quarantine-атрибут:
+```bash
+xattr -dr com.apple.quarantine Open_AG_Patcher_macOS
+```
 
-В меню выберите `2. Apply Antigravity patch` для standalone `Antigravity.app` или `1. Apply Antigravity IDE patch` для `Antigravity IDE.app`.
+#### Что выбрать в меню
+Используйте:
+- `1. Apply Antigravity IDE patch` для `Antigravity IDE.app`
+- `2. Apply Antigravity patch` для standalone `Antigravity.app`
+- `3` или `4` для восстановления из backup
+
+Для standalone `Antigravity.app` патчер обычно сам находит:
+```text
+/Applications/Antigravity.app
+```
+Если автопоиск не нашел приложение, выберите `7. Select custom path` и укажите один из путей:
+```text
+/Applications/Antigravity.app
+/Applications/Antigravity IDE.app
+```
+
+#### Проверить подпись
+После патча `.app` автоматически переподписывается ad-hoc подписью. Проверить это можно следующей командой:
+```bash
+codesign -dv /Applications/Antigravity.app 2>&1 | grep Signature
+```
+Ожидаемый результат:
+```text
+Signature=adhoc
+```
 
 ## ❓ Что именно меняется
 
