@@ -389,13 +389,39 @@ xcode-select --install
 - **Поддерживаемые версии**: `1.22.2` и выше (с версионным выбором auth-паттерна для `1.23+`)
 
 ## 🛠️ Сборка
-Требуется `pyinstaller`:
-```bash
-pip install -r requirements.txt
-Windows: pyinstaller --onefile --uac-admin --icon=icon.ico --name="Open_AG_Patcher_Windows" --noupx --clean --version-file=version.txt main.py
-Linux:   pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
-macOS:   pyinstaller --onefile --name="Open_AG_Patcher_macOS" --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
-```
+
+Для сборки исполняемых файлов рекомендуется использовать виртуальное окружение:
+
+1. **Создание и активация виртуального окружения:**
+   * **Windows:**
+     ```bash
+     python -m venv .venv
+     .venv\Scripts\activate
+     ```
+   * **Linux / macOS:**
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     ```
+
+2. **Установка зависимостей:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Сборка через PyInstaller:**
+   * **Windows:**
+     ```bash
+     pyinstaller --onefile --uac-admin --icon=icon.ico --name="Open_AG_Patcher_Windows" --noupx --clean --version-file=version.txt main.py
+     ```
+   * **Linux:**
+     ```bash
+     pyinstaller --onefile --icon=icon.ico --name="Open_AG_Patcher_Linux" --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
+     ```
+   * **macOS (Universal2):**
+     ```bash
+     pyinstaller --onefile --name="Open_AG_Patcher_macOS" --target-arch universal2 --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
+     ```
 
 ## Структура проекта
 - `main.py` — основная точка входа в патчер (выполняет проверку прав доступа и запуск CLI).
