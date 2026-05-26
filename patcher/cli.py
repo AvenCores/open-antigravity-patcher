@@ -256,9 +256,12 @@ def run_cli():
         elif choice == "6":
             print_target_info(main_js_path, antigravity_root, show_search_line=searched)
             print()
-            url = "https://github.com/AvenCores/open-antigravity-unlock"
-            webbrowser.open(url)
-            print(f"  [+] Opening: {color(url, COLOR_CYAN)}")
+            if confirmed("Open GitHub repository in browser?"):
+                url = "https://github.com/AvenCores/open-antigravity-unlock"
+                webbrowser.open(url)
+                print(f"  [+] Opening: {color(url, COLOR_CYAN)}")
+            else:
+                print("  [x] Cancelled.")
         elif choice == "7":
             while True:
                 redraw_main_screen(main_js_path, antigravity_root, show_search_line=searched)
