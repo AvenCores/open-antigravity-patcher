@@ -29,6 +29,8 @@ from patcher.asar.discovery import (
 )
 from patcher.ide.patcher import is_already_patched, do_patch, do_restore, do_fix_429
 from patcher.asar.patcher import do_patch_antigravity, do_restore_antigravity
+from patcher.agy.discovery import find_agy_binary, resolve_agy_path
+from patcher.agy.patcher import is_already_patched as is_agy_patched, do_patch_agy, do_restore_agy
 
 
 def pause():
@@ -97,10 +99,10 @@ def confirmed(question):
     return prompt_yn(question) in ("y", "yes", "\u0434", "\u0434\u0430")
 
 
-def print_target_info(main_js_path, antigravity_root="", show_search_line=False):
+def print_target_info(main_js_path, antigravity_root="", agy_path="", show_search_line=False):
     if show_search_line:
         print("  [*] Searching for installations...")
-    
+
     # 1. Antigravity IDE Info
     print(f"  [*] Antigravity IDE Target: {color(main_js_path if main_js_path else 'Not found', COLOR_CYAN)}")
     if main_js_path and os.path.exists(main_js_path):
@@ -160,17 +162,34 @@ def print_target_info(main_js_path, antigravity_root="", show_search_line=False)
     else:
         print(f"      Status:  {color('not found', COLOR_RED)}")
 
+    print()
 
-def redraw_main_screen(main_js_path, antigravity_root="", show_search_line=False):
+    # 3. Antigravity CLI Info
+    print(f"  [*] Antigravity CLI Target: {color(agy_path if agy_path else 'Not found', COLOR_CYAN)}")
+    if agy_path and os.path.isfile(agy_path):
+        print(f"      Status:  {color('found', COLOR_GREEN)}")
+        if is_agy_patched(agy_path):
+            patch_text = color("already patched", COLOR_YELLOW)
+        else:
+            patch_text = color("not patched", COLOR_GREEN)
+        print(f"      Patch:   {patch_text}")
+        size = file_size(agy_path)
+        print(f"      Size:    {color(format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)}")
+    else:
+        print(f"      Status:  {color('not found', COLOR_YELLOW)}")
+
+
+def redraw_main_screen(main_js_path, antigravity_root="", agy_path="", show_search_line=False):
     clear_screen()
     print_banner()
-    print_target_info(main_js_path, antigravity_root, show_search_line=show_search_line)
+    print_target_info(main_js_path, antigravity_root, agy_path, show_search_line=show_search_line)
     print()
 
 
 def run_cli():
     main_js_path = ""
     antigravity_root = ""
+    agy_path = ""
     searched = False
 
     # 1. Проверяем аргументы командной строки
@@ -180,45 +199,56 @@ def run_cli():
             arg = " ".join(args)
             main_js_path, antigravity_root = assign_custom_path(arg)
             if not main_js_path and not antigravity_root:
-                print(color(f"  [!] Provided path does not exist or invalid: {arg}", COLOR_RED))
+                resolved_agy = resolve_agy_path(arg)
+                if resolved_agy:
+                    agy_path = resolved_agy
+                else:
+                    print(color(f"  [!] Provided path does not exist or invalid: {arg}", COLOR_RED))
 
     # 2. Проверяем текущую директорию (для Antigravity IDE)
-    if not main_js_path and not antigravity_root:
+    if not main_js_path and not antigravity_root and not agy_path:
         local = os.path.join(os.getcwd(), "main.js")
         if os.path.exists(local):
             main_js_path = local
             print("  [*] Found main.js in current directory")
 
     # 3. Авто-поиск в системе
-    if not main_js_path and not antigravity_root:
+    if not main_js_path and not antigravity_root and not agy_path:
         print("  [*] Searching for installations...")
         searched = True
-        
+
         ide_root = find_install_root()
         if ide_root:
             main_js_path = find_main_js(ide_root)
-            
+
         antigravity_root = find_antigravity_root()
+        agy_path = find_agy_binary()
 
     # Если ничего не нашли вообще, просим ввести вручную сразу
-    if not main_js_path and not antigravity_root:
+    if not main_js_path and not antigravity_root and not agy_path:
         print(color("  [!] No installations found automatically.", COLOR_YELLOW))
-        print("  [i] Please specify the path to Antigravity IDE, Antigravity, or main.js.")
+        print("  [i] Please specify the path to Antigravity IDE, Antigravity, agy, or main.js.")
         print_path_examples()
         raw = input(color("\n  Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
         if raw:
             main_js_path, antigravity_root = assign_custom_path(raw)
+            if not main_js_path and not antigravity_root:
+                resolved_agy = resolve_agy_path(raw)
+                if resolved_agy:
+                    agy_path = resolved_agy
 
-    redraw_main_screen(main_js_path, antigravity_root, show_search_line=searched)
+    redraw_main_screen(main_js_path, antigravity_root, agy_path, show_search_line=searched)
 
     while True:
         print(color("  1. Apply Antigravity IDE patch", COLOR_GREEN))
         print(color("  2. Apply Antigravity patch", COLOR_GREEN))
-        print(color("  3. Restore Antigravity IDE from backup", COLOR_YELLOW))
-        print(color("  4. Restore Antigravity from backup", COLOR_YELLOW))
-        print(color("  5. Fix HTTP 429 (Too Many Requests)", COLOR_CYAN))
-        print(color("  6. Open GitHub repository", COLOR_CYAN))
-        print(color("  7. Select custom path", COLOR_CYAN))
+        print(color("  3. Apply Antigravity CLI (agy) patch", COLOR_GREEN))
+        print(color("  4. Restore Antigravity IDE from backup", COLOR_YELLOW))
+        print(color("  5. Restore Antigravity from backup", COLOR_YELLOW))
+        print(color("  6. Restore Antigravity CLI from backup", COLOR_YELLOW))
+        print(color("  7. Fix HTTP 429 (Too Many Requests)", COLOR_CYAN))
+        print(color("  8. Open GitHub repository", COLOR_CYAN))
+        print(color("  9. Select custom path", COLOR_CYAN))
         print(color("  0. Exit", COLOR_RED))
 
         choice = input(color("\n  > ", COLOR_CYAN, COLOR_BOLD)).strip()
@@ -235,26 +265,36 @@ def run_cli():
             if main_js_path:
                 do_patch(main_js_path, show_search_line=searched)
             else:
-                print(color("  [!] Antigravity IDE path is not set. Please select custom path (Option 7) first.", COLOR_RED))
+                print(color("  [!] Antigravity IDE path is not set. Please select custom path (Option 9) first.", COLOR_RED))
         elif choice == "2":
             if antigravity_root:
                 do_patch_antigravity(antigravity_root)
             else:
-                print(color("  [!] Antigravity path is not set. Please select custom path (Option 7) first.", COLOR_RED))
+                print(color("  [!] Antigravity path is not set. Please select custom path (Option 9) first.", COLOR_RED))
         elif choice == "3":
+            if agy_path:
+                do_patch_agy(agy_path)
+            else:
+                print(color("  [!] Antigravity CLI path is not set. Please select custom path (Option 9) first.", COLOR_RED))
+        elif choice == "4":
             if main_js_path:
                 do_restore(main_js_path, show_search_line=searched)
             else:
-                print(color("  [!] Antigravity IDE path is not set. Please select custom path (Option 7) first.", COLOR_RED))
-        elif choice == "4":
+                print(color("  [!] Antigravity IDE path is not set. Please select custom path (Option 9) first.", COLOR_RED))
+        elif choice == "5":
             if antigravity_root:
                 do_restore_antigravity(antigravity_root)
             else:
-                print(color("  [!] Antigravity path is not set. Please select custom path (Option 7) first.", COLOR_RED))
-        elif choice == "5":
-            do_fix_429()
+                print(color("  [!] Antigravity path is not set. Please select custom path (Option 9) first.", COLOR_RED))
         elif choice == "6":
-            print_target_info(main_js_path, antigravity_root, show_search_line=searched)
+            if agy_path:
+                do_restore_agy(agy_path)
+            else:
+                print(color("  [!] Antigravity CLI path is not set. Please select custom path (Option 9) first.", COLOR_RED))
+        elif choice == "7":
+            do_fix_429()
+        elif choice == "8":
+            print_target_info(main_js_path, antigravity_root, agy_path, show_search_line=searched)
             print()
             if confirmed("Open GitHub repository in browser?"):
                 url = "https://github.com/AvenCores/open-antigravity-unlock"
@@ -262,17 +302,18 @@ def run_cli():
                 print(f"  [+] Opening: {color(url, COLOR_CYAN)}")
             else:
                 print("  [x] Cancelled.")
-        elif choice == "7":
+        elif choice == "9":
             while True:
-                redraw_main_screen(main_js_path, antigravity_root, show_search_line=searched)
+                redraw_main_screen(main_js_path, antigravity_root, agy_path, show_search_line=searched)
                 print(color("  1. Select Antigravity IDE path", COLOR_GREEN))
                 print(color("  2. Select Antigravity path", COLOR_GREEN))
+                print(color("  3. Select Antigravity CLI path", COLOR_GREEN))
                 print(color("  0. Back", COLOR_RED))
 
                 sub_choice = input(color("\n  > ", COLOR_CYAN, COLOR_BOLD)).strip()
                 if sub_choice == "0":
                     break
-                
+
                 if sub_choice == "1":
                     print("\n  [i] Enter the path to Antigravity IDE folder or main.js file.")
                     print_path_examples()
@@ -299,6 +340,19 @@ def run_cli():
                         else:
                             print(color("  [!] Could not resolve a valid Antigravity target.", COLOR_RED))
                     pause()
+                elif sub_choice == "3":
+                    print("\n  [i] Enter the path to the agy binary (agy.exe) or its folder.")
+                    print_path_examples()
+                    raw = input(color("\n  AGY Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
+                    if raw:
+                        new_agy = resolve_agy_path(raw)
+                        if new_agy:
+                            agy_path = new_agy
+                            searched = False
+                            print(color("  [+] Antigravity CLI path updated!", COLOR_GREEN))
+                        else:
+                            print(color("  [!] Could not resolve a valid Antigravity CLI target.", COLOR_RED))
+                    pause()
             handled = True
         else:
             handled = False
@@ -307,4 +361,4 @@ def run_cli():
 
         if handled:
             pause()
-            redraw_main_screen(main_js_path, antigravity_root, show_search_line=searched)
+            redraw_main_screen(main_js_path, antigravity_root, agy_path, show_search_line=searched)
