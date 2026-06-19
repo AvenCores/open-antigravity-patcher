@@ -23,7 +23,7 @@
 
 Опенсорс патчер для Antigravity IDE и standalone-приложения Antigravity: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
 
-![maxresdefault](https://i.ibb.co/Xf1Bq3gp/chrome-Fnngi-Dygdz.png)
+![maxresdefault](https://i.ibb.co/zWzG9VXJ/firefox-a-FK1-Mklh1-M.png)
 
 # 🎦 Видео гайд по установке и решению проблем
 
@@ -65,7 +65,7 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 Если вы столкнулись с ошибкой `HTTP 429 Too Many Requests`, это означает, что лимиты (квоты) на стороне Google исчерпаны. Обычно это связано с привязкой сессии к исчерпанной квоте.
 
 **Решение:**
-1. Используйте встроенную функцию в патчере — **пункт 3: Fix HTTP 429 (Too Many Requests)**.
+1. Используйте встроенную функцию в патчере — **пункт 7: Fix HTTP 429 (Too Many Requests)**.
    - Скрипт создаст бэкап папки данных, очистит старую конфигурацию (сбросит токены/квоту), но **сохранит ваши диалоги**.
    - После выполнения нужно будет заново войти в аккаунт.
 2. Если встроенный фикс не помог — попробуйте сменить аккаунт Google.
@@ -110,7 +110,8 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 - [5xx Server Errors: The Complete Guide](https://komodor.com/learn/5xx-server-errors-the-complete-guide/) — подробный разбор серверных ошибок.
 
 ## 🌟 Возможности
-- Автоматический поиск установленного Antigravity IDE и standalone-приложения Antigravity в стандартных путях и реестре Windows.
+- Автоматический поиск установленного Antigravity IDE, standalone-приложения Antigravity и Antigravity CLI (`agy`) в стандартных путях и реестре Windows.
+- **Патч Antigravity CLI** — снятие экрана «Eligibility Check» в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре (с резервной копией и откатом).
 - Полноценная распаковка, модификация и обратная запаковка `app.asar` для Antigravity с сохранением структуры внешних распакованных файлов (`.unpacked`).
 - Интегрированный локальный HTTP-прокси сервер для динамического патчинга загружаемого JS-кода в standalone-приложении Antigravity.
 - Поддержка Linux: поиск по `/usr/share/antigravity-ide`, определение версии через `dpkg`, `rpm` и `package.json`.
@@ -133,11 +134,13 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 |---|---|
 | `1. Apply Antigravity IDE patch` | Применить патч к `main.js` для Antigravity IDE |
 | `2. Apply Antigravity patch` | Применить патч к `app.asar` для standalone Antigravity |
-| `3. Restore Antigravity IDE from backup` | Восстановить оригинальный `main.js` для Antigravity IDE |
-| `4. Restore Antigravity from backup (Rollback)` | Восстановить оригинальный `app.asar` для Antigravity |
-| `5. Fix HTTP 429` | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
-| `6. Open GitHub repository` | Открыть страницу проекта в браузере |
-| `7. Select custom path` | Выбрать путь к папке приложения или файлу вручную |
+| `3. Apply Antigravity CLI (agy) patch` | Применить патч к бинарю `agy`/`agy.exe` для Antigravity CLI |
+| `4. Restore Antigravity IDE from backup` | Восстановить оригинальный `main.js` для Antigravity IDE |
+| `5. Restore Antigravity from backup` | Восстановить оригинальный `app.asar` для standalone Antigravity |
+| `6. Restore Antigravity CLI from backup` | Восстановить оригинальный `agy`/`agy.exe` |
+| `7. Fix HTTP 429` | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
+| `8. Open GitHub repository` | Открыть страницу проекта в браузере |
+| `9. Select custom path` | Выбрать путь к папке приложения или файлу вручную |
 | `0. Exit` | Выйти |
 
 Запуск из исходников:
@@ -145,19 +148,22 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 python main.py
 ```
 
-Запуск с указанием пути (для Antigravity IDE или standalone Antigravity):
+Запуск с указанием пути (для Antigravity IDE, standalone Antigravity или Antigravity CLI):
 ```bash
 # Windows
 python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity IDE"
 python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity\\resources\\app.asar"
+python main.py "C:\\Users\\<username>\\AppData\\Local\\agy\\bin\\agy.exe"
 
 # Linux
 python main.py /usr/share/antigravity-ide
 python main.py /opt/Antigravity
+python main.py /usr/local/bin/agy
 
 # macOS
 python3 main.py /Applications/Antigravity\ IDE.app
 python3 main.py /Applications/Antigravity.app
+python3 main.py /usr/local/bin/agy
 ```
 
 Если `main.js` или `app.asar` находится рядом со скриптом, путь указывать не нужно — они будут найдены автоматически.
@@ -204,13 +210,14 @@ xattr -dr com.apple.quarantine Open_AG_Patcher_macOS
 Используйте:
 - `1. Apply Antigravity IDE patch` для `Antigravity IDE.app`
 - `2. Apply Antigravity patch` для standalone `Antigravity.app`
-- `3` или `4` для восстановления из backup
+- `3. Apply Antigravity CLI (agy) patch` для бинаря `agy` (если установлен)
+- `4`, `5` или `6` для восстановления из backup
 
 Для standalone `Antigravity.app` патчер обычно сам находит:
 ```text
 /Applications/Antigravity.app
 ```
-Если автопоиск не нашел приложение, выберите `7. Select custom path` и укажите один из путей:
+Если автопоиск не нашел приложение, выберите `9. Select custom path` и укажите один из путей:
 ```text
 /Applications/Antigravity.app
 /Applications/Antigravity IDE.app
@@ -289,6 +296,28 @@ Signature=adhoc
 > - Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity IDE `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.
 > - Начиная с v1.0.8 патчер использует **версионный выбор auth-паттерна**: для версий Antigravity IDE < 1.23 применяется старый паттерн, для v1.23+ — новый с дополнительным вызовом `send()`.
 
+### Патч для Antigravity CLI (agy)
+
+Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, `agy` на Linux/macOS), который тоже показывает косметический экран «Eligibility Check», блокирующий дальнейшую работу. Поскольку это скомпилированный бинарь (не JS), патчинг выполняется **на уровне машинного кода** по уникальной байтовой сигнатуре.
+
+1. В функции `handleAuthResult` eligibility-гейт строится на серверном поле `AuthResult.hasValidAuth` (байт по смещению `+8`):
+   ```asm
+   test rax,rax      ; 48 85 c0
+   je   ...          ; 0f 84 xx xx xx xx
+   cmp  byte[rax+8],0; 80 78 08 00     <-- проверка eligibility
+   jne  ...          ; 0f 85 xx xx xx xx
+   ```
+2. Патчер находит эту последовательность по сигнатуре (с wildcardами для displacement-байтов) и переписывает `cmp byte[rax+8],0` на `test rax,rax ; nop` (`48 85 c0 90`). При этом `ZF=0`, и условный переход `jne` всегда берёт «eligible»-ветку — экран Eligibility больше не показывается.
+3. Перед записью создаётся резервная копия `agy.exe.agybak` (или `agy.agybak` на POSIX). Если существующий бэкап устарел (приложение автообновилось), он автоматически обновляется — stale-копии не хранятся.
+4. На macOS после модификации бинарь переподписывается ad-hoc (как и в случае с `.app`).
+
+**Безопасность патча:**
+- Если байтовая сигнатура не найдена в бинаре (неизвестная/неподдерживаемая версия), патчер **отказывается патчить** и ничего не меняет — выводится «signature not found (unsupported version?)».
+- Если сигнатура встречается больше одного раза, патчер тоже отказывается («not unique — refusing to guess») — не угадывает, какой сайт править.
+- Откат выполняется пунктом `6. Restore Antigravity CLI from backup` восстановлением из `.agybak`.
+
+> **Примечание по платформам:** сигнатура проверена под Windows (Go-бинарь `agy.exe`). Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux/macOS бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
+
 ## 🔍 Логика поиска файла
 
 Патчер ищет `main.js` в следующем порядке:
@@ -314,6 +343,18 @@ Signature=adhoc
 - `main.js` (если путь указан напрямую)
 
 На macOS скрипт также принимает путь к `.app`-бандлу напрямую — `Contents/Resources/app/out/main.js` ресолвится автоматически.
+
+### Поиск Antigravity CLI (`agy`)
+
+Бинарь `agy` (`agy.exe` на Windows) ищется location-agnostic — по `PATH` и стандартным каталогам, без хардкодных путей/версий:
+
+1. Аргумент командной строки или пункт `9. Select custom path → 3` (путь к файлу `agy`/`agy.exe` или к папке).
+2. `PATH` (`shutil.which("agy")`).
+3. Стандартные каталоги:
+   - **Windows:** `%LOCALAPPDATA%`, `%PROGRAMFILES%`, `%PROGRAMFILES(X86)%`, `%ProgramData%`, `%APPDATA%` (+ подпапки `Programs`), scoop (`%USERPROFILE%\scoop\apps`, `%SCOOP%\apps`). Шаблоны: `agy/bin/agy.exe`, `agy/*/bin/agy.exe` (scoop version-dirs), `agy*/agy.exe`.
+   - **Linux/macOS:** `/usr/local/bin`, `/usr/bin`, `/opt/antigravity/bin`, `/opt/antigravity`, `~/.local/bin`, `~/bin`.
+
+Если найдено несколько копий (например, scoop с несколькими версиями), выбирается самая свежая по mtime.
 
 ## 🔎 Определение версии Antigravity IDE
 
@@ -431,6 +472,7 @@ xcode-select --install
   - `utils/` — системные вспомогательные утилиты (цвета консоли, права администратора, POSIX-права, хэширование файлов).
   - `ide/` — логика поиска и патчинга непосредственно Antigravity IDE (файлы `main.js`).
   - `asar/` — логика распаковки/упаковки архивов ASAR и патчинга приложения Antigravity.
+  - `agy/` — логика поиска и байт-сигнатурного патчинга бинаря Antigravity CLI (`agy`/`agy.exe`).
 - `requirements.txt` — зависимости для сборки и запуска.
 - `build.txt` — примеры команд сборки под разные ОС.
 - `icon.ico` — иконка для `exe`/`app`.
