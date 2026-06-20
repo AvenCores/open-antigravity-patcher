@@ -24,6 +24,10 @@ COLOR_GREEN = CSI + "32m"
 COLOR_YELLOW = CSI + "33m"
 COLOR_RED = CSI + "31m"
 COLOR_BOLD = CSI + "1m"
+COLOR_DIM = CSI + "2m"
+COLOR_GRAY = CSI + "90m"
+COLOR_WHITE = CSI + "97m"
+COLOR_MAGENTA = CSI + "35m"
 
 RE_AUTH_IS_GOOGLE_INTERNAL = re.compile(
     r'if\(\s*(?P<prefix>(?:this\.[A-Za-z_$][\w$]*\.send\(\{type:[^}]+\}\)\s*,\s*)?'

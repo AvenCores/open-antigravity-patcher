@@ -11,7 +11,15 @@ from patcher.constants import (
     COLOR_RED,
     COLOR_BOLD,
 )
-from patcher.utils.console import color, clear_screen, print_banner
+from patcher.utils.console import (
+    color,
+    clear_screen,
+    print_banner,
+    print_menu_section,
+    print_menu_row,
+    print_menu_divider,
+    print_menu_footer,
+)
 from patcher.utils.file import file_size, format_bytes
 
 from patcher.ide.discovery import (
@@ -240,18 +248,26 @@ def run_cli():
     redraw_main_screen(main_js_path, antigravity_root, agy_path, show_search_line=searched)
 
     while True:
-        print(color("  1. Apply Antigravity IDE patch", COLOR_GREEN))
-        print(color("  2. Apply Antigravity patch", COLOR_GREEN))
-        print(color("  3. Apply Antigravity CLI (agy) patch", COLOR_GREEN))
-        print(color("  4. Restore Antigravity IDE from backup", COLOR_YELLOW))
-        print(color("  5. Restore Antigravity from backup", COLOR_YELLOW))
-        print(color("  6. Restore Antigravity CLI from backup", COLOR_YELLOW))
-        print(color("  7. Fix HTTP 429 (Too Many Requests)", COLOR_CYAN))
-        print(color("  8. Open GitHub repository", COLOR_CYAN))
-        print(color("  9. Select custom path", COLOR_CYAN))
-        print(color("  0. Exit", COLOR_RED))
+        print_menu_section("PATCH")
+        print_menu_row("1", "Antigravity IDE patch", "bypass region lock", COLOR_GREEN)
+        print_menu_row("2", "Antigravity patch", "unlock full app", COLOR_GREEN)
+        print_menu_row("3", "Antigravity CLI (agy) patch", "unlock agy tool", COLOR_GREEN)
 
-        choice = input(color("\n  > ", COLOR_CYAN, COLOR_BOLD)).strip()
+        print_menu_section("RESTORE")
+        print_menu_row("4", "Antigravity IDE", "from backup", COLOR_YELLOW)
+        print_menu_row("5", "Antigravity", "from backup", COLOR_YELLOW)
+        print_menu_row("6", "Antigravity CLI", "from backup", COLOR_YELLOW)
+
+        print_menu_section("TOOLS")
+        print_menu_row("7", "Fix HTTP 429", "rate-limit / too many requests", COLOR_CYAN)
+        print_menu_row("8", "Open GitHub repository", "source & updates", COLOR_CYAN)
+        print_menu_row("9", "Select custom path", "override auto-detected target", COLOR_CYAN)
+
+        print()
+        print_menu_row("0", "Exit", "quit the patcher", COLOR_RED)
+        print_menu_footer("Tip: patches are reversible — use RESTORE any time.")
+
+        choice = input(color("\n  Select option > ", COLOR_CYAN, COLOR_BOLD)).strip()
         print()
 
         if choice in ("0", ""):
@@ -305,12 +321,15 @@ def run_cli():
         elif choice == "9":
             while True:
                 redraw_main_screen(main_js_path, antigravity_root, agy_path, show_search_line=searched)
-                print(color("  1. Select Antigravity IDE path", COLOR_GREEN))
-                print(color("  2. Select Antigravity path", COLOR_GREEN))
-                print(color("  3. Select Antigravity CLI path", COLOR_GREEN))
-                print(color("  0. Back", COLOR_RED))
+                print_menu_section("SELECT CUSTOM PATH")
+                print_menu_row("1", "Antigravity IDE path", "folder or main.js", COLOR_GREEN)
+                print_menu_row("2", "Antigravity path", "app folder", COLOR_GREEN)
+                print_menu_row("3", "Antigravity CLI path", "agy.exe or folder", COLOR_GREEN)
+                print()
+                print_menu_row("0", "Back", "return to main menu", COLOR_RED)
+                print_menu_footer("Leaves auto-detection results intact for other targets.")
 
-                sub_choice = input(color("\n  > ", COLOR_CYAN, COLOR_BOLD)).strip()
+                sub_choice = input(color("\n  Select option > ", COLOR_CYAN, COLOR_BOLD)).strip()
                 if sub_choice == "0":
                     break
 

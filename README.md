@@ -23,7 +23,7 @@
 
 Опенсорс патчер для Antigravity IDE и standalone-приложения Antigravity: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
 
-![maxresdefault](https://i.ibb.co/zWzG9VXJ/firefox-a-FK1-Mklh1-M.png)
+![maxresdefault](https://i.ibb.co/8gRr0VYn/firefox-T1-KEg-V7j-Gg.png)
 
 # 🎦 Видео гайд по установке и решению проблем
 
