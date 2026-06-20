@@ -65,7 +65,7 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 Если вы столкнулись с ошибкой `HTTP 429 Too Many Requests`, это означает, что лимиты (квоты) на стороне Google исчерпаны. Обычно это связано с привязкой сессии к исчерпанной квоте.
 
 **Решение:**
-1. Используйте встроенную функцию в патчере — **пункт 7: Fix HTTP 429 (Too Many Requests)**.
+1. Используйте встроенную функцию в патчере — **Fix HTTP 429** (TOOLS → `7`).
    - Скрипт создаст бэкап папки данных, очистит старую конфигурацию (сбросит токены/квоту), но **сохранит ваши диалоги**.
    - После выполнения нужно будет заново войти в аккаунт.
 2. Если встроенный фикс не помог — попробуйте сменить аккаунт Google.
@@ -90,7 +90,7 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 **Важно:** использование VPN, прокси или других способов обхода ограничений может детектироваться Google и приводить к этой ошибке. Google активно борется с методами обхода, и если ваш IP-адрес или другие параметры сессии вызывают подозрение, доступ может быть заблокирован.
 
 **Решение:**
-1. Если вы используете Antigravity IDE версии **1.23.0 или выше**, примените патч (**пункт 1: Apply patch**). Патчер автоматически добавит в `settings.json` необходимые параметры для обхода этой ошибки (подробнее в разделе [Временный runtime settings workaround](#5-временный-runtime-settings-workaround-v123)).
+1. Если вы используете Antigravity IDE версии **1.23.0 или выше**, примените патч (**PATCH → `1`: Antigravity IDE patch**). Патчер автоматически добавит в `settings.json` необходимые параметры для обхода этой ошибки (подробнее в разделе [Временный runtime settings workaround](#5-временный-runtime-settings-workaround-v123)).
 2. Если патч уже применен или версия ниже 1.23, попробуйте сменить аккаунт Google или использовать другой VPN.
 3. Попробуйте использовать **[Xbox DNS](https://xbox-dns.ru/)** (специальные DNS-серверы для обхода ограничений на ПК или роутере).
 
@@ -132,16 +132,19 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 
 | Пункт меню | Описание |
 |---|---|
-| `1. Apply Antigravity IDE patch` | Применить патч к `main.js` для Antigravity IDE |
-| `2. Apply Antigravity patch` | Применить патч к `app.asar` для standalone Antigravity |
-| `3. Apply Antigravity CLI (agy) patch` | Применить патч к бинарю `agy`/`agy.exe` для Antigravity CLI |
-| `4. Restore Antigravity IDE from backup` | Восстановить оригинальный `main.js` для Antigravity IDE |
-| `5. Restore Antigravity from backup` | Восстановить оригинальный `app.asar` для standalone Antigravity |
-| `6. Restore Antigravity CLI from backup` | Восстановить оригинальный `agy`/`agy.exe` |
-| `7. Fix HTTP 429` | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
-| `8. Open GitHub repository` | Открыть страницу проекта в браузере |
-| `9. Select custom path` | Выбрать путь к папке приложения или файлу вручную |
-| `0. Exit` | Выйти |
+| **PATCH** | |
+| `1` Antigravity IDE patch | Применить патч к `main.js` для Antigravity IDE (bypass region lock) |
+| `2` Antigravity patch | Применить патч к `app.asar` для standalone Antigravity (unlock full app) |
+| `3` Antigravity CLI (agy) patch | Применить патч к бинарю `agy`/`agy.exe` (unlock agy tool) |
+| **RESTORE** | |
+| `4` Antigravity IDE | Восстановить оригинальный `main.js` для Antigravity IDE из бэкапа |
+| `5` Antigravity | Восстановить оригинальный `app.asar` для standalone Antigravity из бэкапа |
+| `6` Antigravity CLI | Восстановить оригинальный `agy`/`agy.exe` из бэкапа |
+| **TOOLS** | |
+| `7` Fix HTTP 429 | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
+| `8` Open GitHub repository | Открыть страницу проекта в браузере |
+| `9` Select custom path | Выбрать путь к папке приложения или файлу вручную |
+| **`0` Exit** | Выйти из патчера |
 
 Запуск из исходников:
 ```bash
@@ -208,16 +211,16 @@ xattr -dr com.apple.quarantine Open_AG_Patcher_macOS
 
 #### Что выбрать в меню
 Используйте:
-- `1. Apply Antigravity IDE patch` для `Antigravity IDE.app`
-- `2. Apply Antigravity patch` для standalone `Antigravity.app`
-- `3. Apply Antigravity CLI (agy) patch` для бинаря `agy` (если установлен)
-- `4`, `5` или `6` для восстановления из backup
+- **PATCH → `1`** (Antigravity IDE patch) для `Antigravity IDE.app`
+- **PATCH → `2`** (Antigravity patch) для standalone `Antigravity.app`
+- **PATCH → `3`** (Antigravity CLI (agy) patch) для бинаря `agy` (если установлен)
+- **RESTORE → `4`**, `5` или `6` для восстановления из бэкапа
 
 Для standalone `Antigravity.app` патчер обычно сам находит:
 ```text
 /Applications/Antigravity.app
 ```
-Если автопоиск не нашел приложение, выберите `9. Select custom path` и укажите один из путей:
+Если автопоиск не нашел приложение, выберите **TOOLS → `9`** (Select custom path) и укажите один из путей:
 ```text
 /Applications/Antigravity.app
 /Applications/Antigravity IDE.app
@@ -281,7 +284,7 @@ Signature=adhoc
 }
 ```
 
-Если `settings.json` уже существует, перед изменением создаётся резервная копия вида `settings.json.bak-YYYYMMDD-HHMMSS`. Если `main.js` уже пропатчен, пункт `Apply patch` всё равно применит runtime workaround без необходимости повторно менять `main.js`.
+Если `settings.json` уже существует, перед изменением создаётся резервная копия вида `settings.json.bak-YYYYMMDD-HHMMSS`. Если `main.js` уже пропатчен, **PATCH → `1`** всё равно применит runtime workaround без необходимости повторно менять `main.js`.
 
 ### Патч для Standalone Antigravity (ASAR)
 
@@ -314,7 +317,7 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 **Безопасность патча:**
 - Если байтовая сигнатура не найдена в бинаре (неизвестная/неподдерживаемая версия), патчер **отказывается патчить** и ничего не меняет — выводится «signature not found (unsupported version?)».
 - Если сигнатура встречается больше одного раза, патчер тоже отказывается («not unique — refusing to guess») — не угадывает, какой сайт править.
-- Откат выполняется пунктом `6. Restore Antigravity CLI from backup` восстановлением из `.agybak`.
+- Откат выполняется через **RESTORE → `6`** (Antigravity CLI) восстановлением из `.agybak`.
 
 > **Примечание по платформам:** сигнатура проверена под Windows (Go-бинарь `agy.exe`). Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux/macOS бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
 
@@ -348,7 +351,7 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 
 Бинарь `agy` (`agy.exe` на Windows) ищется location-agnostic — по `PATH` и стандартным каталогам, без хардкодных путей/версий:
 
-1. Аргумент командной строки или пункт `9. Select custom path → 3` (путь к файлу `agy`/`agy.exe` или к папке).
+1. Аргумент командной строки или **TOOLS → `9` → `3`** (путь к файлу `agy`/`agy.exe` или к папке).
 2. `PATH` (`shutil.which("agy")`).
 3. Стандартные каталоги:
    - **Windows:** `%LOCALAPPDATA%`, `%PROGRAMFILES%`, `%PROGRAMFILES(X86)%`, `%ProgramData%`, `%APPDATA%` (+ подпапки `Programs`), scoop (`%USERPROFILE%\scoop\apps`, `%SCOOP%\apps`). Шаблоны: `agy/bin/agy.exe`, `agy/*/bin/agy.exe` (scoop version-dirs), `agy*/agy.exe`.
