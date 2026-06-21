@@ -105,6 +105,20 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 }
 ```
 
+## ⚠️ Ошибка лицензии Antigravity CLI (#3501)
+Если в Antigravity CLI (`agy`) появляется ошибка `You do not have a valid license of this product`, это не проблема локального патча и не экран `Eligibility Check`.
+
+Эта ошибка связана с API Google и состоянием аккаунта пользователя: лицензией, доступом или проверкой прав на стороне Google. Патчер меняет только локальные файлы Antigravity/Antigravity CLI и не может выдать аккаунту лицензию или изменить ответ Google API, поэтому с этой ошибкой он не поможет.
+
+**Пример ошибки:**
+```text
+⚠ You do not have a valid license of this product. Please contact your administrator to request a license. If you are
+not an enterprise user and believe you are receiving this message as an error, please try using the latest version and
+logging in again. (#3501)
+Error ID: b2c1d9edcaac4fd5ac5766de06c2253b
+Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
+```
+
 ## 📚 Дополнительная информация по ошибкам
 Для более глубокого понимания типов HTTP-ошибок и способов их диагностики рекомендуем ознакомиться с данным руководством:
 - [5xx Server Errors: The Complete Guide](https://komodor.com/learn/5xx-server-errors-the-complete-guide/) — подробный разбор серверных ошибок.
