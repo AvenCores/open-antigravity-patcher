@@ -1,8 +1,8 @@
 import os
 import ctypes
 from patcher.constants import (
-    VERSION, COLOR_RESET, COLOR_CYAN, COLOR_GREEN, COLOR_YELLOW, COLOR_BOLD,
-    COLOR_DIM, COLOR_GRAY, COLOR_WHITE, COLOR_MAGENTA,
+    VERSION, COLOR_RESET, COLOR_CYAN, COLOR_GREEN, COLOR_YELLOW, COLOR_RED,
+    COLOR_BOLD, COLOR_DIM, COLOR_GRAY, COLOR_WHITE,
 )
 
 USE_COLOR = False
@@ -42,80 +42,18 @@ def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def print_banner():
-    # Внутренняя ширина баннера (между левой и правой рамками).
-    # Паддинг считается автоматически, поэтому правая граница остаётся ровной
-    # при любой длине названия или версии.
-    width = 47
-
-    def row(left, right=""):
-        """Собирает строку баннера с точной видимой шириной `width`.
-
-        left/right — уже окрашенные фрагменты. left прижимается влево (отступ 2),
-        right — вправо (отступ 1 от правой рамки). При отсутствии right строка
-        просто добивается пробелами до нужной ширины.
-        """
-        left_str = "  " + left
-        right_str = right
-        fill = width - _visible_len(left_str) - _visible_len(right_str) - 1
-        if fill < 1:
-            fill = 1
-        body = left_str + (" " * fill) + right_str + " "
-        # Корректируем до точной ширины на случай ошибок округления/ANSI.
-        vis = _visible_len(body)
-        if vis < width:
-            body = left_str + (" " * (fill + width - vis)) + right_str + " "
-        elif vis > width:
-            while _visible_len(body) > width:
-                body = body[:-1]
-        return (
-            color("║", COLOR_CYAN, COLOR_BOLD)
-            + body
-            + color("║", COLOR_CYAN, COLOR_BOLD)
-        )
-
-    def border(left_ch, fill_ch, right_ch):
-        return color(left_ch + fill_ch * width + right_ch, COLOR_CYAN, COLOR_BOLD)
-
-    title_left = color("Open AG Patcher", COLOR_BOLD)
-    title_right = color(f"v{VERSION}", COLOR_GREEN, COLOR_BOLD)
-
-    label_col = 12  # ширина колонки подписей (Telegram/YouTube) для ровной сетки
-    telegram = color("Telegram".ljust(label_col), COLOR_YELLOW) + color("t.me/avencoresyt", COLOR_DIM)
-    youtube = color("YouTube".ljust(label_col), COLOR_YELLOW) + color("youtube.com/@avencores", COLOR_DIM)
-
-    print()
-    print(f"  {border('╔', '═', '╗')}")
-    print(f"  {row(title_left, title_right)}")
-    print(f"  {row(color('Region bypass for Antigravity', COLOR_CYAN))}")
-    print(f"  {row(color('Clean • No keys • No telemetry', COLOR_GREEN))}")
-    print(f"  {border('╟', '─', '╢')}")
-    print(f"  {row(telegram)}")
-    print(f"  {row(youtube)}")
-    print(f"  {border('╚', '═', '╝')}")
-    print()
-
-
-# ─── Menu UI helpers ──────────────────────────────────────────────────────────
-# Ширина панели меню подбирается под внешнюю ширину баннера (49 символов),
-# чтобы правый край разделителей меню совпадал с правой рамкой баннера.
-MENU_WIDTH = 49
-
-
-def _center_line(text, width=MENU_WIDTH):
-    """Дополняет строку пробелами справа до полной ширины панели меню."""
-    visible = _visible_len(text)
-    if visible >= width:
-        return text
-    return text + " " * (width - visible)
+# Layout constants shared by banner, menu dividers, and summary panels.
+# BANNER_INNER_WIDTH is the visible width inside a framed box.
+# MENU_WIDTH is the matching outer menu width, including the frame columns.
+BANNER_INNER_WIDTH = 47
+MENU_WIDTH = BANNER_INNER_WIDTH + 2
 
 
 def _visible_len(text):
-    """Длина строки без ANSI-кодов (для выравнивания по ширине)."""
+    """Return visible text length without ANSI color escapes."""
     if "\x1b[" not in text:
         return len(text)
     out = []
-    i = 0
     in_code = False
     for ch in text:
         if ch == "\x1b":
@@ -129,6 +67,117 @@ def _visible_len(text):
     return len(out)
 
 
+# Shared frame helpers for the banner and operation summary panels.
+def _frame_border(left_ch, fill_ch, right_ch, accent=COLOR_CYAN):
+    """Build a horizontal frame border."""
+    return color(left_ch + fill_ch * BANNER_INNER_WIDTH + right_ch, accent, COLOR_BOLD)
+
+
+def _frame_row(left, right="", accent=COLOR_CYAN):
+    """Build a frame row with left text and optional right-aligned text."""
+    left_str = "  " + left
+    fill = BANNER_INNER_WIDTH - _visible_len(left_str) - _visible_len(right) - 1
+    if fill < 1:
+        fill = 1
+    body = left_str + (" " * fill) + right + " "
+    # Correct to exact visible width in case ANSI escapes skew the padding.
+    vis = _visible_len(body)
+    if vis < BANNER_INNER_WIDTH:
+        body = left_str + (" " * (fill + BANNER_INNER_WIDTH - vis)) + right + " "
+    elif vis > BANNER_INNER_WIDTH:
+        while _visible_len(body) > BANNER_INNER_WIDTH:
+            body = body[:-1]
+    return color("║", accent, COLOR_BOLD) + body + color("║", accent, COLOR_BOLD)
+
+
+def print_banner():
+    title_left = color("Open AG Patcher", COLOR_BOLD)
+    title_right = color(f"v{VERSION}", COLOR_GREEN, COLOR_BOLD)
+
+    label_col = 12  # ширина колонки подписей (Telegram/YouTube) для ровной сетки
+    telegram = color("Telegram".ljust(label_col), COLOR_YELLOW) + color("t.me/avencoresyt", COLOR_DIM)
+    youtube = color("YouTube".ljust(label_col), COLOR_YELLOW) + color("youtube.com/@avencores", COLOR_DIM)
+
+    print()
+    print(f"  {_frame_border('╔', '═', '╗')}")
+    print(f"  {_frame_row(title_left, title_right)}")
+    print(f"  {_frame_row(color('Region bypass for Antigravity', COLOR_CYAN))}")
+    print(f"  {_frame_row(color('Clean • No keys • No telemetry', COLOR_GREEN))}")
+    print(f"  {_frame_border('╟', '─', '╢')}")
+    print(f"  {_frame_row(telegram)}")
+    print(f"  {_frame_row(youtube)}")
+    print(f"  {_frame_border('╚', '═', '╝')}")
+    print()
+
+
+def print_panel(title, rows, accent=COLOR_GREEN):
+    """Render a compact framed summary panel for operation results."""
+    print()
+    print(f"  {_frame_border('╔', '═', '╗', accent)}")
+    print(f"  {_frame_row(color(title, COLOR_BOLD), accent=accent)}")
+    print(f"  {_frame_border('╟', '─', '╢', accent)}")
+    for label, value in rows:
+        value = str(value)
+        if "\x1b[" not in value:
+            value = color(value, COLOR_CYAN)
+        label_text = color(f"{label}:", COLOR_WHITE)
+        print(f"  {_frame_row(label_text, value, accent=accent)}")
+    print(f"  {_frame_border('╚', '═', '╝', accent)}")
+    print()
+
+
+# Shared marker helpers for all operation output.
+def info(msg):
+    """Neutral progress/status line."""
+    print(f"  [*] {msg}")
+
+
+def hint(msg):
+    """Dim hint line."""
+    print(color(f"  [i] {msg}", COLOR_DIM))
+
+
+def ok(msg):
+    """Green success line."""
+    print(color(f"  [+] {msg}", COLOR_GREEN, COLOR_BOLD))
+
+
+def warn(msg):
+    """Yellow warning line."""
+    print(color(f"  [!] {msg}", COLOR_YELLOW))
+
+
+def err(msg):
+    """Red error line."""
+    print(color(f"  [!] {msg}", COLOR_RED))
+
+
+def cancel(msg):
+    """Dim cancellation line."""
+    print(color(f"  [x] {msg}", COLOR_DIM))
+
+
+def step(name, applied, detail=""):
+    """Checklist row: green check, red cross, or dim neutral marker for skipped steps."""
+    if applied is None:
+        marker = color("•", COLOR_DIM)
+    else:
+        marker = color("✓", COLOR_GREEN) if applied else color("✗", COLOR_RED)
+    line = f"  {marker} {name}"
+    if detail:
+        line += color(f" — {detail}", COLOR_DIM)
+    print(line)
+
+
+def _center_line(text, width=MENU_WIDTH):
+    """Дополняет строку пробелами справа до полной ширины панели меню."""
+    visible = _visible_len(text)
+    if visible >= width:
+        return text
+    return text + " " * (width - visible)
+
+
+# ─── Menu UI helpers ──────────────────────────────────────────────────────────
 def print_menu_section(title):
     """Заголовок секции меню, обведённый тонкой линией.
 

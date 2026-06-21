@@ -139,9 +139,8 @@ def find_portable_candidates(search_type="ide"):
                                 candidates.append(dirpath)
                                 label = "Antigravity IDE"
                                 try:
-                                    from patcher.constants import COLOR_GREEN
-                                    from patcher.utils.console import color
-                                    print(color(f"  [+] Found portable {label} at: {dirpath}", COLOR_GREEN))
+                                    from patcher.utils.console import ok
+                                    ok(f"Found portable {label} at: {dirpath}")
                                 except Exception:
                                     print(f"  [+] Found portable {label} at: {dirpath}")
                                 break
@@ -153,9 +152,8 @@ def find_portable_candidates(search_type="ide"):
                             candidates.append(dirpath)
                             label = "Antigravity"
                             try:
-                                from patcher.constants import COLOR_GREEN
-                                from patcher.utils.console import color
-                                print(color(f"  [+] Found portable {label} at: {dirpath}", COLOR_GREEN))
+                                from patcher.utils.console import ok
+                                ok(f"Found portable {label} at: {dirpath}")
                             except Exception:
                                 print(f"  [+] Found portable {label} at: {dirpath}")
 

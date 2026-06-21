@@ -121,27 +121,26 @@ def resign_macos_bundle(main_js_path):
     if sys.platform != "darwin":
         return
 
-    from patcher.utils.console import color
-    from patcher.constants import COLOR_GREEN, COLOR_YELLOW
+    from patcher.utils.console import info, ok, warn
 
     app_path = find_app_bundle(main_js_path)
     if not app_path:
         # main.js лежит не внутри .app (например, portable-копия) — пропускаем
         return
 
-    print(f"  [*] Re-signing {os.path.basename(app_path)} (ad-hoc)...")
+    info(f"Re-signing {os.path.basename(app_path)} (ad-hoc)...")
     try:
         subprocess.run(
             ["codesign", "--force", "--deep", "--sign", "-", app_path],
             check=True, capture_output=True, text=True,
         )
-        print(color("  [+] Ad-hoc signature applied", COLOR_GREEN))
+        ok("Ad-hoc signature applied")
     except FileNotFoundError:
-        print(color("  [!] codesign not found — install Xcode Command Line Tools", COLOR_YELLOW))
+        warn("codesign not found - install Xcode Command Line Tools")
         return
     except subprocess.CalledProcessError as e:
         stderr = (e.stderr or "").strip()
-        print(color(f"  [!] codesign failed: {stderr}", COLOR_YELLOW))
+        warn(f"codesign failed: {stderr}")
         return
 
     try:
@@ -151,4 +150,3 @@ def resign_macos_bundle(main_js_path):
         )
     except FileNotFoundError:
         pass
-

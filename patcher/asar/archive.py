@@ -6,7 +6,8 @@ import hashlib
 import tempfile
 import time
 
-from patcher.constants import INTEGRITY_BLOCK_SIZE, PACK_EXCLUDE_PATHS, COLOR_RED, COLOR_YELLOW
+from patcher.constants import INTEGRITY_BLOCK_SIZE, PACK_EXCLUDE_PATHS
+from patcher.utils.console import info, ok, warn, err
 from patcher.utils.file import fix_posix_permissions
 
 
@@ -58,10 +59,10 @@ def find_unpacked_file(asar_path, current_path):
 def extract_asar(asar_path, dest_dir):
     asar_path = os.path.abspath(asar_path)
     if not os.path.exists(asar_path):
-        print(f"  [!] Error: ASAR file not found at '{asar_path}'")
+        err(f"ASAR file not found at '{asar_path}'")
         return False
-        
-    print(f"  [*] Extracting '{os.path.basename(asar_path)}' to temp directory...")
+
+    info(f"Extracting '{os.path.basename(asar_path)}' to temp directory...")
     
     with open(asar_path, 'rb') as f:
         try:
@@ -70,14 +71,14 @@ def extract_asar(asar_path, dest_dir):
             json_size_plus_4 = struct.unpack('<I', f.read(4))[0]
             json_size = struct.unpack('<I', f.read(4))[0]
         except struct.error:
-            print("  [!] Error: Invalid ASAR file format (unable to read header structure).")
+            err("Invalid ASAR file format (unable to read header structure).")
             return False
         
         try:
             json_bytes = f.read(json_size)
             header = json.loads(json_bytes.decode('utf-8'))
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            print(f"  [!] Error: Failed to parse ASAR header JSON: {e}")
+            err(f"Failed to parse ASAR header JSON: {e}")
             return False
             
         payload_offset = 8 + header_size
@@ -97,7 +98,7 @@ def extract_asar(asar_path, dest_dir):
                     if src_file:
                         shutil.copy2(src_file, file_path)
                     else:
-                        print(f"  [!] Warning: Unpacked file '{current_path}' not found in external directory.")
+                        warn(f"Unpacked file '{current_path}' not found in external directory.")
                 else:
                     offset = int(entry['offset'])
                     size = entry['size']
@@ -108,7 +109,7 @@ def extract_asar(asar_path, dest_dir):
 
         extract_entry(header, '')
         fix_posix_permissions(dest_dir)
-        print("  [+] Extraction completed successfully.")
+        ok("Extraction completed successfully.")
         return True
 
 
@@ -136,7 +137,7 @@ def get_unpacked_paths(asar_path):
             
             collect_unpacked(header, '')
     except Exception as e:
-        print(f"  [!] Warning: Could not read original ASAR header to check unpacked files: {e}")
+        warn(f"Could not read original ASAR header to check unpacked files: {e}")
         
     return unpacked_paths
 
@@ -193,22 +194,21 @@ def build_asar_tree(source_dir, unpacked_paths, payload_file, unpacked_dir):
 
 
 def pack_asar(source_dir, asar_path, reference_asar_path=None):
-    from patcher.utils.console import color
     from patcher.utils.admin import terminate_processes
     from patcher.cli import confirmed
 
-    print(f"  [*] Packing '{source_dir}' to '{os.path.basename(asar_path)}'...")
+    info(f"Packing '{source_dir}' to '{os.path.basename(asar_path)}'...")
     
     unpacked_paths = get_unpacked_paths(reference_asar_path or asar_path)
     if unpacked_paths:
-        print(f"  [*] Found {len(unpacked_paths)} unpacked files to preserve.")
+        info(f"Found {len(unpacked_paths)} unpacked files to preserve.")
         
     unpacked_dir = asar_path + '.unpacked'
     if os.path.exists(unpacked_dir):
         try:
             shutil.rmtree(unpacked_dir)
         except Exception as e:
-            print(f"  [!] Warning: Could not clear old unpacked directory: {e}")
+            warn(f"Could not clear old unpacked directory: {e}")
     os.makedirs(unpacked_dir, exist_ok=True)
     
     temp_payload_fd, temp_payload_path = tempfile.mkstemp()
@@ -251,27 +251,27 @@ def pack_asar(source_dir, asar_path, reference_asar_path=None):
                                 except Exception:
                                     pass
                             os.rename(asar_path, temp_old_path)
-                            print(f"  [*] Locked file renamed to {os.path.basename(temp_old_path)}")
+                            info(f"Locked file renamed to {os.path.basename(temp_old_path)}")
 
                     shutil.move(temp_asar_path, asar_path)
                     replace_success = True
                     break
                 except PermissionError as e:
                     if attempt == 0:
-                        print(color(f"  [!] Permission denied (ASAR file locked): {e}", COLOR_YELLOW))
+                        warn(f"Permission denied (ASAR file locked): {e}")
                         if confirmed("Would you like to automatically close running Antigravity processes and retry?"):
                             terminate_processes(["Antigravity", "Antigravity IDE", "antigravity", "antigravity-ide"])
                             time.sleep(1.5)
                             continue
-                    print(color(f"  [!] Error: Could not overwrite or rename '{asar_path}' (locked by another process). {e}", COLOR_RED))
+                    err(f"Could not overwrite or rename '{asar_path}' (locked by another process). {e}")
                     return False
                 except Exception as e:
-                    print(color(f"  [!] Error during ASAR replacement: {e}", COLOR_RED))
+                    err(f"Error during ASAR replacement: {e}")
                     return False
 
             if not replace_success:
                 return False
-            print("  [+] Packing completed successfully.")
+            ok("Packing completed successfully.")
             
             if os.path.exists(unpacked_dir) and not os.listdir(unpacked_dir):
                 os.rmdir(unpacked_dir)

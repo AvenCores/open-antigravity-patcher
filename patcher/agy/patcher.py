@@ -5,14 +5,17 @@ import shutil
 import contextlib
 import filecmp
 
-from patcher.constants import (
-    COLOR_GREEN,
-    COLOR_YELLOW,
-    COLOR_RED,
-    COLOR_CYAN,
-    COLOR_BOLD,
+from patcher.constants import COLOR_CYAN
+from patcher.utils.console import (
+    color,
+    info,
+    hint,
+    ok,
+    warn,
+    err,
+    step,
+    print_panel,
 )
-from patcher.utils.console import color
 from patcher.utils.file import (
     file_hash,
     file_size,
@@ -115,38 +118,39 @@ def _make_backup(path):
     if os.path.exists(bak):
         if filecmp.cmp(path, bak, shallow=False):
             return  # бэкап уже соответствует этому билду
-        print(color(f"  [*] Backup is stale (app updated) — refreshing {os.path.basename(path)}{BAK_EXT}", COLOR_YELLOW))
+        info(f"Backup is stale (app updated) — refreshing {os.path.basename(path)}{BAK_EXT}")
     else:
-        print(f"  [*] Creating backup -> {os.path.basename(path)}{BAK_EXT}")
+        info(f"Creating backup -> {os.path.basename(path)}{BAK_EXT}")
     shutil.copy2(path, bak)
     fix_posix_permissions(bak)
-    print(f"  [+] Backup: {os.path.basename(bak)} ({format_bytes(file_size(bak))})")
+    ok(f"Backup: {os.path.basename(bak)} ({format_bytes(file_size(bak))})")
 
 
 def do_patch_agy(path):
     from patcher.cli import confirmed
 
     if not os.path.isfile(path):
-        print(color(f"  [!] Target is not a file: {path}", COLOR_RED))
-        print(color("  [i] Please select a valid agy/agy.exe binary.", COLOR_YELLOW))
+        err(f"Target is not a file: {path}")
+        hint("Please select a valid agy/agy.exe binary.")
         return
 
     hash_before = file_hash(path)
-    print(f"  [*] Target: {color(path, COLOR_CYAN)}")
-    print(f"  [i] Size: {color(format_bytes(file_size(path)), COLOR_CYAN)}")
+    info(f"Target: {color(path, COLOR_CYAN)}")
+    hint(f"Size: {color(format_bytes(file_size(path)), COLOR_CYAN)}")
     print()
 
     write_success = False
+    off = 0
     for attempt in range(2):
         if is_locked(path):
             if attempt == 0:
-                print(color("  [!] Binary is locked (Antigravity CLI is running).", COLOR_YELLOW))
+                warn("Binary is locked (Antigravity CLI is running).")
                 if confirmed("Would you like to automatically close running agy processes and retry?"):
                     terminate_processes(["agy"])
                     import time
                     time.sleep(1.5)
                     continue
-            print(color("  [!] File is locked — close Antigravity CLI first.", COLOR_RED))
+            err("File is locked — close Antigravity CLI first.")
             return
 
         # Сканируем в mmap, закрываем ДО записи (zero-copy scan)
@@ -155,13 +159,13 @@ def do_patch_agy(path):
                 try:
                     kind, off = CLI_GATE.find(d)
                 except LookupError as e:
-                    print(color(f"  [!] {e}", COLOR_RED))
+                    err(f"{e}")
                     return
                 if kind == "patched":
-                    print(color("  [i] agy already patched — nothing to do.", COLOR_YELLOW))
+                    hint("agy already patched — nothing to do.")
                     return
         except OSError as e:
-            print(color(f"  [!] Read error: {e}", COLOR_RED))
+            err(f"Read error: {e}")
             return
 
         _make_backup(path)
@@ -175,16 +179,16 @@ def do_patch_agy(path):
             write_success = True
         except PermissionError as e:
             if attempt == 0:
-                print(color(f"  [!] Permission denied (file locked): {e}", COLOR_YELLOW))
+                warn(f"Permission denied (file locked): {e}")
                 if confirmed("Would you like to automatically close running agy processes and retry?"):
                     terminate_processes(["agy"])
                     import time
                     time.sleep(1.5)
                     continue
-            print(color(f"  [!] Write error (Permission denied): {e}", COLOR_RED))
+            err(f"Write error (Permission denied): {e}")
             return
         except Exception as e:
-            print(color(f"  [!] Write error: {e}", COLOR_RED))
+            err(f"Write error: {e}")
             return
 
     if not write_success:
@@ -193,39 +197,44 @@ def do_patch_agy(path):
     hash_after = file_hash(path)
     resign_macos_bundle(path)
     print()
-    print(color("  [+] agy patched", COLOR_GREEN, COLOR_BOLD))
-    print(f"      {CLI_GATE.desc} @ file 0x{off:x}")
+    step("Patch agy binary", True, CLI_GATE.desc)
+    print()
+    panel_rows = [
+        ("Target", os.path.basename(path)),
+        ("Gate", f"{CLI_GATE.desc} @ 0x{off:x}"),
+    ]
     if hash_before and hash_after:
-        print(f"  [+] Before: {hash_before[:8]}...{hash_before[56:]}")
-        print(f"  [+] After:  {hash_after[:8]}...{hash_after[56:]}")
-    print("  [i] Restart Antigravity CLI for the change to take effect.")
+        panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
+        panel_rows.append(("After", f"{hash_after[:8]}...{hash_after[56:]}"))
+    print_panel("PATCH COMPLETE", panel_rows)
+    hint("Restart Antigravity CLI for the change to take effect.")
 
 
 def do_restore_agy(path):
     from patcher.cli import confirmed
 
     if not os.path.isfile(path):
-        print(color(f"  [!] Target is not a file: {path}", COLOR_RED))
+        err(f"Target is not a file: {path}")
         return
 
     bak = path + BAK_EXT
     if not os.path.exists(bak):
-        print(color(f"  [!] No backup for {os.path.basename(path)} (nothing to restore).", COLOR_YELLOW))
+        warn(f"No backup for {os.path.basename(path)} (nothing to restore).")
         return
 
     status, _ = get_status(path)
     if status != "patched":
-        print(color("  [!] agy is not patched — skipping restore (backup may be a different build).", COLOR_YELLOW))
+        warn("agy is not patched — skipping restore (backup may be a different build).")
         if not confirmed("Restore from backup anyway?"):
-            print("  [i] Restore cancelled.")
+            hint("Restore cancelled.")
             return
 
     if is_locked(path):
-        print(color("  [!] Binary is locked — close Antigravity CLI first.", COLOR_RED))
+        err("Binary is locked — close Antigravity CLI first.")
         return
 
     if not confirmed("Restore agy from backup?"):
-        print("  [i] Restore cancelled.")
+        hint("Restore cancelled.")
         return
 
     hash_before = file_hash(path)
@@ -233,12 +242,14 @@ def do_restore_agy(path):
         shutil.copy2(bak, path)
         fix_posix_permissions(path)
     except Exception as e:
-        print(color(f"  [!] Restore error: {e}", COLOR_RED))
+        err(f"Restore error: {e}")
         return
 
     hash_after = file_hash(path)
     resign_macos_bundle(path)
-    print(color(f"  [+] Restored {os.path.basename(path)} from backup.", COLOR_GREEN))
+    print()
+    panel_rows = [("Target", os.path.basename(path))]
     if hash_before and hash_after and hash_before != hash_after:
-        print(f"  [+] Before: {hash_before[:8]}...{hash_before[56:]}")
-        print(f"  [+] After:  {hash_after[:8]}...{hash_after[56:]}")
+        panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
+        panel_rows.append(("After", f"{hash_after[:8]}...{hash_after[56:]}"))
+    print_panel("RESTORE COMPLETE", panel_rows)

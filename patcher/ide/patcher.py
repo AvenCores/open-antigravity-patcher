@@ -15,13 +15,18 @@ from patcher.constants import (
     RE_AUTH_IS_GOOGLE_INTERNAL,
     RE_AUTH_IS_GOOGLE_INTERNAL_OLD,
     RE_AUTH_IS_GOOGLE_INTERNAL_NEW,
-    COLOR_GREEN,
-    COLOR_YELLOW,
-    COLOR_RED,
     COLOR_CYAN,
-    COLOR_BOLD,
 )
-from patcher.utils.console import color
+from patcher.utils.console import (
+    color,
+    info,
+    hint,
+    ok,
+    warn,
+    err,
+    step,
+    print_panel,
+)
 from patcher.utils.admin import terminate_processes
 from patcher.utils.file import (
     file_hash,
@@ -273,9 +278,11 @@ def patch_runtime_settings(ag_version=None):
 
 
 def print_runtime_settings_result(result):
-    icon = "  ✓" if result.get("Applied") else "  ✗"
-    detail = f" — {result.get('Detail')}" if result.get("Detail") else ""
-    print(f"{icon} {result['Name']}{detail}")
+    applied = result.get("Applied", False)
+    detail = result.get("Detail", "")
+    if not applied and detail.startswith("skipped"):
+        applied = None
+    step(result["Name"], applied, detail)
 
 
 def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_content=None):
@@ -291,7 +298,7 @@ def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_c
         with open(backup_path, "r", encoding="utf-8") as f:
             backup_content = f.read()
     except Exception as e:
-        print(color(f"  [!] Backup check error: {e}", COLOR_YELLOW))
+        warn(f"Backup check error: {e}")
         return False, False
 
     if backup_size <= 2048 or len(backup_content.strip()) <= 512:
@@ -308,9 +315,9 @@ def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_c
         return True, False
 
     for warning in warnings:
-        print(color(f"  [!] Backup warning: {warning}", COLOR_YELLOW))
-    print(color("  [!] Restoring this backup may break Antigravity IDE.", COLOR_YELLOW))
-    print(color(f"  [i] Backup kept: {os.path.basename(backup_path)}", COLOR_YELLOW))
+        warn(f"Backup warning: {warning}")
+    warn("Restoring this backup may break Antigravity IDE.")
+    warn(f"Backup kept: {os.path.basename(backup_path)}")
     return True, True
 
 
@@ -318,25 +325,25 @@ def do_patch(main_js_path, show_search_line=False):
     from patcher.cli import confirmed
 
     if not os.path.isfile(main_js_path):
-        print(color(f"  [!] Target is not a file: {main_js_path}", COLOR_RED))
-        print(color("  [i] Please select a valid main.js file or Antigravity IDE folder.", COLOR_YELLOW))
+        err(f"Target is not a file: {main_js_path}")
+        hint("Please select a valid main.js file or Antigravity IDE folder.")
         return
 
     ver_status, ver_str = check_ag_version(main_js_path)
     parsed_version = parse_version_safe(ver_str)
 
     if ver_status == VersionStatus.TOO_OLD:
-        print(color(f"  [!] Unsupported version: {ver_str}", COLOR_RED))
-        print(color(f"  [!] Minimum required: {MIN_AG_VERSION}", COLOR_RED))
-        print("  [i] Please update Antigravity IDE and try again.")
+        err(f"Unsupported version: {ver_str}")
+        err(f"Minimum required: {MIN_AG_VERSION}")
+        hint("Please update Antigravity IDE and try again.")
         if not confirmed("Proceed anyway?"):
             return
     elif ver_status == VersionStatus.NOT_FOUND:
-        print(color("  [!] Could not detect Antigravity IDE version (registry key not found).", COLOR_YELLOW))
+        warn("Could not detect Antigravity IDE version (registry key not found).")
         if not confirmed("Proceed without version check?"):
             return
     elif ver_status == VersionStatus.PARSE_ERROR:
-        print(color(f"  [!] Could not parse version string: {ver_str}", COLOR_YELLOW))
+        warn(f"Could not parse version string: {ver_str}")
         if not confirmed("Proceed anyway?"):
             return
     # VersionStatus.OK — продолжаем без вопросов
@@ -345,15 +352,15 @@ def do_patch(main_js_path, show_search_line=False):
         with open(main_js_path, "r", encoding="utf-8") as f:
             content = f.read()
     except Exception as e:
-        print(f"  [!] Read error: {e}")
+        err(f"Read error: {e}")
         return
 
     current_is_patched = is_already_patched(content)
     runtime_settings_checked = False
 
     if current_is_patched:
-        print("  [i] File appears already patched.")
-        print("  [*] Applying runtime settings workaround...")
+        hint("File appears already patched.")
+        info("Applying runtime settings workaround...")
         print_runtime_settings_result(patch_runtime_settings(parsed_version))
         runtime_settings_checked = True
         if not confirmed("Apply main.js patches anyway?"):
@@ -363,23 +370,23 @@ def do_patch(main_js_path, show_search_line=False):
     backup_path = main_js_path + ".bak"
 
     if not os.path.exists(backup_path) and not current_is_patched:
-        print("  [*] Creating backup...")
+        info("Creating backup...")
         try:
             shutil.copy2(main_js_path, backup_path)
             fix_posix_permissions(backup_path)
-            print(f"  [+] Backup: {os.path.basename(backup_path)} "
-                  f"({format_bytes(file_size(backup_path))})")
+            ok(f"Backup: {os.path.basename(backup_path)} "
+               f"({format_bytes(file_size(backup_path))})")
         except Exception as e:
-            print(f"  [!] Backup error: {e}")
+            err(f"Backup error: {e}")
             return
     elif os.path.exists(backup_path):
-        print("  [i] Backup already exists — skipping")
+        hint("Backup already exists — skipping")
     elif current_is_patched:
-        print(color("  [!] main.js is already patched — no backup needed", COLOR_YELLOW))
+        warn("main.js is already patched — no backup needed")
 
     hash_before = file_hash(main_js_path)
 
-    print("  [*] Applying patches...")
+    info("Applying patches...")
     print()
 
     # Для v1.22+ auth-патч выбирается по версии: <1.23 старый, >=1.23 новый.
@@ -387,15 +394,13 @@ def do_patch(main_js_path, show_search_line=False):
 
     applied = 0
     for r in results:
-        icon = "  ✓" if r.get("Applied") else "  ✗"
         if r.get("Applied"):
             applied += 1
-        detail = f" — {r.get('Detail')}" if r.get("Detail") else ""
-        print(f"{icon} {r['Name']}{detail}")
+        step(r["Name"], r.get("Applied", False), r.get("Detail", ""))
     print()
 
     if applied == 0:
-        print("  [!] No patches applied.")
+        err("No patches applied.")
         return
 
     write_success = False
@@ -408,15 +413,15 @@ def do_patch(main_js_path, show_search_line=False):
             break
         except PermissionError as e:
             if attempt == 0:
-                print(color(f"  [!] Permission denied (file locked): {e}", COLOR_YELLOW))
+                warn(f"Permission denied (file locked): {e}")
                 if confirmed("Would you like to automatically close running Antigravity processes and retry?"):
                     terminate_processes(["Antigravity", "Antigravity IDE", "antigravity", "antigravity-ide"])
                     time.sleep(1.5)
                     continue
-            print(color(f"  [!] Write error (Permission denied): {e}", COLOR_RED))
+            err(f"Write error (Permission denied): {e}")
             return
         except Exception as e:
-            print(color(f"  [!] Write error: {e}", COLOR_RED))
+            err(f"Write error: {e}")
             return
 
     if not write_success:
@@ -425,15 +430,23 @@ def do_patch(main_js_path, show_search_line=False):
     hash_after = file_hash(main_js_path)
     resign_macos_bundle(main_js_path)
     if not runtime_settings_checked:
-        print("  [*] Applying runtime settings workaround...")
+        info("Applying runtime settings workaround...")
         print_runtime_settings_result(patch_runtime_settings(parsed_version))
-    print(f"  [+] Patches: {applied}/{len(results)} applied")
+
+    panel_rows = [
+        ("Target", os.path.basename(main_js_path)),
+        ("Patches", f"{applied}/{len(results)} applied"),
+    ]
+    if os.path.exists(backup_path):
+        panel_rows.append(
+            ("Backup", f"{os.path.basename(backup_path)} ({format_bytes(file_size(backup_path))})")
+        )
     if hash_before and hash_after:
-        print(f"  [+] Before:  {hash_before[:8]}...{hash_before[56:]}")
-        print(f"  [+] After:   {hash_after[:8]}...{hash_after[56:]}")
-    print(f"  [+] Done at  {time.strftime('%H:%M:%S')}")
-    print()
-    print("  Restart Antigravity IDE and sign in.")
+        panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
+        panel_rows.append(("After", f"{hash_after[:8]}...{hash_after[56:]}"))
+    panel_rows.append(("Done", time.strftime('%H:%M:%S')))
+    print_panel("PATCH COMPLETE", panel_rows)
+    hint("Restart Antigravity IDE and sign in.")
 
 
 def do_fix_429():
@@ -441,13 +454,13 @@ def do_fix_429():
 
     data_dir = get_user_data_dir()
     if not data_dir or not os.path.isdir(data_dir):
-        print(color("  [!] Antigravity IDE data directory not found.", COLOR_RED))
+        err("Antigravity IDE data directory not found.")
         return
 
-    print(f"  [*] Data directory: {color(data_dir, COLOR_CYAN)}")
-    print(color("  [!] This will reset your Antigravity IDE configuration (tokens, quota).", COLOR_YELLOW))
-    print(color("  [!] Dialogues will be preserved, but you will need to sign in again.", COLOR_YELLOW))
-    print(color("  [!] Ensure Antigravity IDE is COMPLETELY closed before proceeding.", COLOR_RED))
+    info(f"Data directory: {color(data_dir, COLOR_CYAN)}")
+    warn("This will reset your Antigravity IDE configuration (tokens, quota).")
+    warn("Dialogues will be preserved, but you will need to sign in again.")
+    err("Ensure Antigravity IDE is COMPLETELY closed before proceeding.")
 
     if not confirmed("Proceed with the fix?"):
         return
@@ -461,7 +474,7 @@ def do_fix_429():
         backup_dir = f"{backup_base}_{counter}"
         counter += 1
 
-    print(f"  [*] Moving current data to: {os.path.basename(backup_dir)}...")
+    info(f"Moving current data to: {os.path.basename(backup_dir)}...")
 
     move_success = False
     for attempt in range(2):
@@ -471,25 +484,25 @@ def do_fix_429():
             break
         except PermissionError as e:
             if attempt == 0:
-                print(color(f"  [!] Permission denied (files locked): {e}", COLOR_YELLOW))
+                warn(f"Permission denied (files locked): {e}")
                 if confirmed("Would you like to automatically close running Antigravity processes and retry?"):
                     terminate_processes(["Antigravity", "Antigravity IDE", "antigravity", "antigravity-ide"])
                     time.sleep(1.5)
                     continue
-            print(color("  [!] Permission denied: Could not move data directory.", COLOR_RED))
-            print(color("  [!] Antigravity IDE is likely still running or holding files.", COLOR_RED))
-            print("  [i] Close Antigravity IDE completely (check Task Manager) and try again.")
+            err("Permission denied: Could not move data directory.")
+            err("Antigravity IDE is likely still running or holding files.")
+            hint("Close Antigravity IDE completely (check Task Manager) and try again.")
             return
         except Exception as e:
-            print(color(f"  [!] Failed to move data directory: {e}", COLOR_RED))
-            print("  [i] Try running the patcher as administrator.")
+            err(f"Failed to move data directory: {e}")
+            hint("Try running the patcher as administrator.")
             return
 
     if not move_success:
         return
 
-    print(color("  [+] Data moved to backup", COLOR_GREEN))
-    print("  [*] Creating fresh configuration...")
+    ok("Data moved to backup")
+    info("Creating fresh configuration...")
 
     try:
         # Recreate the data directory and User subfolder
@@ -503,33 +516,36 @@ def do_fix_429():
             src = os.path.join(backup_dir, "User", folder)
             dst = os.path.join(user_dir, folder)
             if os.path.isdir(src):
-                print(f"  [*] Restoring {folder}...")
+                info(f"Restoring {folder}...")
                 try:
                     shutil.copytree(src, dst)
                     restored_count += 1
                 except Exception as e:
-                    print(color(f"  [!] Could not restore {folder}: {e}", COLOR_YELLOW))
-        
+                    warn(f"Could not restore {folder}: {e}")
+
         if restored_count > 0:
-            print(color(f"  [+] Restored {restored_count} storage folder(s)", COLOR_GREEN))
+            ok(f"Restored {restored_count} storage folder(s)")
         else:
-            print(color("  [i] No storage folders were restored", COLOR_YELLOW))
+            hint("No storage folders were restored")
 
         # Fix permissions on POSIX if running as root
         fix_posix_permissions(data_dir)
 
-        print(color("\n  [+] HTTP 429 fix applied successfully!", COLOR_GREEN, COLOR_BOLD))
-        print("  [i] What to do now:")
+        print_panel("HTTP 429 FIX APPLIED", [
+            ("Backup", os.path.basename(backup_dir)),
+            ("Folders", f"{restored_count} restored"),
+        ])
+        hint("What to do now:")
         print("      1. Start Antigravity IDE.")
         print("      2. Sign in to your account.")
         print("      3. If you still see errors, run 'Apply patch' (Option 1) again.")
-        print("      [!] Note: VPNs or other bypass methods might be detected by Google and cause 429 errors.")
-        print(f"  [i] Your backup is safe at: {backup_dir}")
+        warn("Note: VPNs or other bypass methods might be detected by Google and cause 429 errors.")
+        hint(f"Your backup is safe at: {backup_dir}")
 
     except Exception as e:
-        print(color(f"  [!] Error during restoration: {e}", COLOR_RED))
-        print(color(f"  [i] Your backup is preserved at: {backup_dir}", COLOR_YELLOW))
-        print("  [i] You can try to restore it manually if needed.")
+        err(f"Error during restoration: {e}")
+        warn(f"Your backup is preserved at: {backup_dir}")
+        hint("You can try to restore it manually if needed.")
 
 
 def do_restore(main_js_path, show_search_line=False):
@@ -552,33 +568,33 @@ def do_restore(main_js_path, show_search_line=False):
 
     # Разделяем "не найден" и "нечитаем"
     if not os.path.exists(backup_path):
-        print(f"  [!] Backup file not found: {backup_path}")
+        err(f"Backup file not found: {backup_path}")
         return
     try:
         with open(backup_path, "r", encoding="utf-8") as f:
             data = f.read()
     except Exception as e:
-        print(f"  [!] Could not read backup: {e}")
+        err(f"Could not read backup: {e}")
         return
 
     # Проверка размера бэкапа
     backup_size = file_size(backup_path)
     if backup_size <= 2048:
-        print(color("  [!] Backup looks too small — may be corrupted!", COLOR_RED))
+        err("Backup looks too small — may be corrupted!")
         if not confirmed("Restore anyway?"):
-            print("  [i] Restore cancelled.")
+            hint("Restore cancelled.")
             return
 
     # Предупреждение, если бэкап сам является пропатченной версией
     if is_already_patched(data):
-        print(color("  [!] Backup itself appears to be patched!", COLOR_YELLOW))
+        warn("Backup itself appears to be patched!")
         if not confirmed("Restore this patched backup?"):
-            print("  [i] Restore cancelled.")
+            hint("Restore cancelled.")
             return
 
     restore_question = "Restore this backup anyway?" if backup_has_warnings else "Restore backup?"
     if not confirmed(restore_question):
-        print("  [i] Restore cancelled.")
+        hint("Restore cancelled.")
         return
 
     hash_before = file_hash(main_js_path)
@@ -591,7 +607,7 @@ def do_restore(main_js_path, show_search_line=False):
         os.replace(tmp_path, main_js_path)
         fix_posix_permissions(main_js_path)
     except Exception as e:
-        print(f"\n  [!] Restore error: {e}")
+        err(f"Restore error: {e}")
         if os.path.exists(tmp_path):
             try:
                 os.remove(tmp_path)
@@ -605,8 +621,9 @@ def do_restore(main_js_path, show_search_line=False):
     from patcher.cli import print_target_info
     print_target_info(main_js_path, show_search_line=show_search_line)
     print()
+    panel_rows = [("Target", os.path.basename(main_js_path))]
     if hash_before and hash_after and hash_before != hash_after:
-        print(f"  [+] Before: {hash_before[:8]}...{hash_before[56:]}")
-        print(f"  [+] After:  {hash_after[:8]}...{hash_after[56:]}")
-    print(f"  [+] Done at {time.strftime('%H:%M:%S')}")
-    print("\n  [+] Restored from backup!")
+        panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
+        panel_rows.append(("After", f"{hash_after[:8]}...{hash_after[56:]}"))
+    panel_rows.append(("Done", time.strftime('%H:%M:%S')))
+    print_panel("RESTORE COMPLETE", panel_rows)
