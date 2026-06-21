@@ -270,8 +270,21 @@ def run_cli():
         choice = input(color("\n  Select option > ", COLOR_CYAN, COLOR_BOLD)).strip()
         print()
 
-        if choice in ("0", ""):
+        if choice == "0":
             return
+
+        # Пустой ввод — не выходим, просто перерисовываем меню
+        if choice == "":
+            redraw_main_screen(main_js_path, antigravity_root, agy_path, show_search_line=searched)
+            continue
+
+        valid_choices = {"1", "2", "3", "4", "5", "6", "7", "8", "9"}
+        if choice not in valid_choices:
+            print(color("  [!] Invalid choice", COLOR_RED))
+            print()
+            pause()
+            redraw_main_screen(main_js_path, antigravity_root, agy_path, show_search_line=searched)
+            continue
 
         handled = True
         clear_screen()
@@ -373,9 +386,7 @@ def run_cli():
                             print(color("  [!] Could not resolve a valid Antigravity CLI target.", COLOR_RED))
                     pause()
             handled = True
-        else:
-            handled = False
-            print("  [!] Invalid choice")
+
         print()
 
         if handled:
