@@ -4,7 +4,6 @@ import re
 import json
 import time
 import shutil
-from packaging.version import Version
 
 from patcher.constants import (
     AUTH_PATCH_SWITCH_VERSION,
@@ -41,7 +40,6 @@ from patcher.ide.discovery import (
     check_ag_version,
     parse_version_safe,
     VersionStatus,
-    get_ag_version,
 )
 
 

@@ -46,6 +46,7 @@ def find_portable_candidates(search_type="ide"):
     # 2. На Linux просим систему дать точные пути через xdg-user-dir
     if sys.platform != "win32" and os.name == "posix":
         import subprocess
+        sudo_user = os.environ.get("SUDO_USER")
         for folder_type in ["DOWNLOAD", "DESKTOP", "DOCUMENTS"]:
             try:
                 cmd = ["xdg-user-dir", folder_type]

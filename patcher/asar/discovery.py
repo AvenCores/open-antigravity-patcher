@@ -172,10 +172,7 @@ def read_package_json_from_asar(asar_path):
         return None
     try:
         with open(asar_path, 'rb') as f:
-            pickle_header = struct.unpack('<I', f.read(4))[0]
-            header_size = struct.unpack('<I', f.read(4))[0]
-            json_size_plus_4 = struct.unpack('<I', f.read(4))[0]
-            json_size = struct.unpack('<I', f.read(4))[0]
+            _, header_size, _, json_size = struct.unpack('<IIII', f.read(16))
             json_bytes = f.read(json_size)
             header = json.loads(json_bytes.decode('utf-8'))
             
