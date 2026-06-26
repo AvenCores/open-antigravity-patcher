@@ -1,8 +1,8 @@
 import re
 from packaging.version import Version
 
-VERSION = "1.1.6"
-MIN_AG_VERSION = "2.0.1"
+VERSION = "1.1.7"
+MIN_AG_VERSION = "2.1.0"
 AUTH_PATCH_SWITCH_VERSION = Version("1.23")
 RUNTIME_SETTINGS_SWITCH_VERSION = Version("1.23")
 CLOUD_CODE_ENDPOINT = "https://cloudcode-pa.googleapis.com"
