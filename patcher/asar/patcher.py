@@ -10,7 +10,11 @@ try:
 except ImportError:
     pwd = None
 
-from patcher.constants import ANTIGRAVITY_INJECTION_CODE_TEMPLATE
+from patcher.constants import (
+    ANTIGRAVITY_INJECTION_CODE_TEMPLATE,
+    LOCAL_PATCH_SERVER_KEY,
+    LOCAL_PATCH_SERVER_CERT,
+)
 from patcher.utils.console import (
     info,
     hint,
@@ -42,7 +46,13 @@ def patch_antigravity_main_js(dest_folder, rollback=False):
         content = f.read()
 
     escaped_dest_folder = dest_folder.replace("\\", "/")
-    injection_code = ANTIGRAVITY_INJECTION_CODE_TEMPLATE.replace("{dest_folder}", escaped_dest_folder)
+    injection_code = ANTIGRAVITY_INJECTION_CODE_TEMPLATE.replace(
+        "{dest_folder}", escaped_dest_folder
+    ).replace(
+        "{key_pem}", LOCAL_PATCH_SERVER_KEY.replace("\n", "\\n")
+    ).replace(
+        "{cert_pem}", LOCAL_PATCH_SERVER_CERT.replace("\n", "\\n")
+    )
 
     if rollback:
         if injection_code in content:

@@ -51,7 +51,79 @@ PACK_EXCLUDE_PATHS = {
     'dist/main.js.bak',
 }
 
+LOCAL_PATCH_SERVER_KEY = """-----BEGIN RSA PRIVATE KEY-----
+MIIEoQIBAAKCAQEA/IUQUX8vQ3LJKoyAS4eJ4Ylfcy/9t1T5ILsag/ZT336h/uid
+NnZDLuKH1jobpfThJ49yOQiKxIunxepFXMtSphWydz8UmHdgnveEbqm8Zh64gomI
+ILZCz2fPX0Kbwgd6jokwQG3nuKNkFD0ASTOnscscK4OvwPVV6VCQ7PnVUIzz4Dzt
+D7aNBx4uPgECs26fxQ6vktUf0/r+oEXH3Z8fwUJSugYYiYiDSzzrwJySAAwYyEgl
+cNGStyuivTwPtq5OUtJ5n1OSRy9ZG8qm6+t7fkDV+50t9W5HMnoxomHN02rIty7U
+z5ViVDqvUcnJvDXWUiXJhrrrsveei2tjKA1NnQIDAQABAoH/QVkuH+kKEipiZOB3
+UxSAWh1y1hxVTFxxHEdPVVcp3Wyn/4+zH6T7PebhwE7JWOlGWzaEGL5dKv/5Kv61
+dI4plVGIHdP1QH+kQX9MhlbmqobIuP9eexivsXzr7XsPU+cbkEdwdTv7+4xNGe+v
+Y0I644fsglZR5V2YHgj7eFgvG+jamu5gQRmixQomFeZuXKYuIsYK9GmbCkTc+L2h
+D3aAMD71SXrds/ljGKs3Q97ohrptrfXYHVNYkKY+J3GVFQFybu3hpB//jw+6PVv6
+cY/NOsXpzUkw5BISmEDjERI3wXYgJK6VqbLG3lRseXuVg+lB0ePyJPAtC9D06NXB
+5fbxAoGBAP9p3qjqWfa9Z1VzWO+SL1jRzt5c/MsHasUZ4OCNK8PNCqZz4FL9WkHY
+1iesFDSk0wKcgn/D5GlS7SooSYboDLV86MlgeFhviUNJMRjYOeg7RlG5VHqtAO5B
+dPglGXcWOMjmkpPzhfItbVr6sip+9tMKRfLWFR1Espvszyo6QQwNAoGBAP0ZfjfW
+PSHmgBkIS0VRPS6qAkRApOXjREgNPOgVKquM3UPQh7dQ52L8VCuzmB3+6/qDJTF2
+LBtS35NsnoqjyRefU7PWf+E4/ONkItsn02ehXIAa324C0+NpeybdFQFuQPLaDGYr
+JePRYPhbUVufzO8RNMn/WEB70wG/S2VuY5PRAoGAWiim/n1rMFv/g/xpone52uKE
+4Z11Zr3BhL3z0ZBDqKRSZBt3ThQ8rg262to1b7fW/I7+ydb+Y+dv7He4LLTw94eW
+LK+vC5ijnWrSt/Br0HxMAEEpfvxe3buhbI68BHuFo/UwPKWz3J8IgRsJlVKoEisI
+MgY8Ac7kNYJMRp21pGkCgYEArMxi6CxUwHhmrLCE82ZrpxhbQ83+xxVK4QZotur8
+nvMlfc85WWbbEzHDJbMQACqzYe13zzUnF+CU1EosU+tOt9oHg5jG5jXKMlWDlqyy
+IOaCCNRQBwPXNkQl2HrIhJmJrkRAguCilc+1rNpryWpouC+/Iso6rovbnC3GhBHB
+2oECgYAgC+PGYtYDHoHPypgfteuxlZU3TLSqh8AvWXUQfJYIuuRnLLfs73g3WQwN
+ezLN4NGO7j3AEs7+ZrI2wP/vTktAy0NTnIiPqX6n+17F+ZGYBYurGB53qNM5e29D
+Th7LHBMym9yAOtK39+Xe5DZF9Rum0WmQ/+t4X014bIDDoQq57A==
+-----END RSA PRIVATE KEY-----"""
+
+LOCAL_PATCH_SERVER_CERT = """-----BEGIN CERTIFICATE-----
+MIIC1jCCAb6gAwIBAgIUFESrtRHXxbijQjSIWOFMtc4X2AMwDQYJKoZIhvcNAQEL
+BQAwFDESMBAGA1UEAwwJMTI3LjAuMC4xMCAXDTI2MDYyNTE2MDcxN1oYDzIxMjYw
+NjAyMTYwNzE3WjAUMRIwEAYDVQQDDAkxMjcuMC4wLjEwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQD8hRBRfy9DcskqjIBLh4nhiV9zL/23VPkguxqD9lPf
+fqH+6J02dkMu4ofWOhul9OEnj3I5CIrEi6fF6kVcy1KmFbJ3PxSYd2Ce94Ruqbxm
+HriCiYggtkLPZ89fQpvCB3qOiTBAbee4o2QUPQBJM6exyxwrg6/A9VXpUJDs+dVQ
+jPPgPO0Pto0HHi4+AQKzbp/FDq+S1R/T+v6gRcfdnx/BQlK6BhiJiINLPOvAnJIA
+DBjISCVw0ZK3K6K9PA+2rk5S0nmfU5JHL1kbyqbr63t+QNX7nS31bkcyejGiYc3T
+asi3LtTPlWJUOq9Rycm8NdZSJcmGuuuy956La2MoDU2dAgMBAAGjHjAcMBoGA1Ud
+EQQTMBGCCWxvY2FsaG9zdIcEfwAAATANBgkqhkiG9w0BAQsFAAOCAQEAymGpI1Ow
+rbvEhUJSnuv2kYca0/bHq6njySOZzFwK2CjvJIDV+IorXfDAp3Ghpcq44rqjgzVm
+Ig/RwbUSyrssiO9SMDA5gGb/yRpJ6ylmWhcpP0YqJeIFASyfz4Nv6lhigInVo3tx
+LKvIVMJGkXFd9/AP793seSeRgBtus5FVh3yj6otQCx40r8PMir69WIfjLjbXAjYd
+rZ3IvZGmBHgon7FnQ56Iriy6YpxTqKNpOxmYcc9BC6dHJzscPxxEDg+PswWEmQY5
+31YnXgQPoSgUaNGIHNnfLDErFLt7lo2vWQ0SchX/I4ENkK7OCLLuFaYwKgtebaHh
+2kQQqEhVMB6fzA==
+-----END CERTIFICATE-----"""
+
 ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
+    // Bypass certificate errors for local servers (language server and patch server)
+    try {
+        electron_1.app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+            if (url.includes('127.0.0.1') || url.includes('localhost')) {
+                event.preventDefault();
+                callback(true);
+            } else {
+                callback(false);
+            }
+        });
+    } catch (err) {
+        console.error('[Debug] Failed to register certificate-error listener:', err);
+    }
+
+    // Redirect renderer console messages to main process logs
+    try {
+        electron_1.app.on('web-contents-created', (event, webContents) => {
+            webContents.on('console-message', (ev, level, message, line, sourceId) => {
+                console.log(`[Renderer Console] ${message} (${sourceId}:${line})`);
+            });
+        });
+    } catch (err) {
+        console.error('[Debug] Failed to redirect renderer console:', err);
+    }
+
     // Start local frontend patch server
     let localServerPort = 0;
     const frontendPatchCache = new Map();
@@ -69,16 +141,16 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
                 detail: applied ? 'Forced frontend isGoogleInternal to true' : 'isGoogleInternal:!1 not found',
             });
             content = nextContent;
-            nextContent = content
-                .split('SET_INELIGIBLE:{target:".loginError"')
-                .join('SET_INELIGIBLE:{target:".signedIn"')
-                .split('SET_ERROR:{target:".loginError"')
-                .join('SET_ERROR:{target:".signedIn"');
+            
+            const oldLs = 'function Ls(a,b){return kka(a,c=>{switch(c.methodKind){case "unary":return tka(b,c);case "server_streaming":return uka(b,c);case "client_streaming":return vka(b,c);case "bidi_streaming":return wka(b,c);default:return null}})}';
+            const newLs = 'function Ls(a,b){var client=kka(a,c=>{switch(c.methodKind){case "unary":return tka(b,c);case "server_streaming":return uka(b,c);case "client_streaming":return vka(b,c);case "bidi_streaming":return wka(b,c);default:return null}});try{var wrap=function(name,mockFn){var orig=client[name];if(typeof orig==="function"){client[name]=async function(...args){try{var res=await orig.apply(client,args);return mockFn(res)}catch(e){console.error("[Wrapper Error] "+name+":",e);return mockFn(null)}}}};wrap("hasAuthToken",function(res){if(!res||!res.hasToken){return{hasToken:true,isGcpTos:false}}return res});wrap("getAuthStatus",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("validateProject",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("loginWithBrowser",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("getUserStatus",function(res){if(!res||!res.userStatus){return{userStatus:{disableTelemetry:false,userDataCollectionForceDisabled:false,userTier:res?.userStatus?.userTier||{name:"Google Internal",upgradeButtonText:""}}}}return res})}catch(err){console.error("[Wrapper Init Error]:",err)}return client}';
+            
+            nextContent = content.split(oldLs).join(newLs);
             applied = nextContent !== content;
             results.push({
-                name: 'SET_INELIGIBLE/SET_ERROR -> target:.signedIn (frontend)',
+                name: 'Mock auth client wrapper (frontend)',
                 applied,
-                detail: applied ? 'Redirected ineligible/error states to signedIn' : 'loginError targets not found',
+                detail: applied ? 'Injected auth wrapper into Ls factory' : 'Ls factory not found',
             });
             content = nextContent;
         }
@@ -95,11 +167,8 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
         if (content.includes('csrfToken') && content.includes('isGoogleInternal')) {
             const internalPatched = !content.includes('isGoogleInternal:!1')
                 && content.includes('isGoogleInternal:!0');
-            const loginRedirectPatched = !content.includes('SET_INELIGIBLE:{target:".loginError"')
-                && !content.includes('SET_ERROR:{target:".loginError"')
-                && (content.includes('SET_INELIGIBLE:{target:".signedIn"')
-                    || content.includes('SET_ERROR:{target:".signedIn"'));
-            return internalPatched && loginRedirectPatched;
+            const clientWrapperPatched = content.includes('wrap("hasAuthToken"');
+            return internalPatched && clientWrapperPatched;
         }
         return false;
     };
@@ -149,9 +218,13 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
         return patchPromise;
     };
     try {
-        const http = require('http');
-        const localServer = http.createServer((req, res) => {
-            const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${localServerPort || 0}`);
+        const https = require('https');
+        const options = {
+            key: "{key_pem}",
+            cert: "{cert_pem}"
+        };
+        const localServer = https.createServer(options, (req, res) => {
+            const requestUrl = new URL(req.url || '/', `https://127.0.0.1:${localServerPort || 0}`);
             if (requestUrl.pathname === '/main.js') {
                 const sourceUrl = requestUrl.searchParams.get('source');
                 if (!sourceUrl) {
@@ -189,7 +262,7 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
         console.log(`[Network Request] ${details.url}`);
         if (details.url.endsWith('/main.js') && details.url.includes('127.0.0.1')) {
             if (localServerPort && !details.url.includes(`:${localServerPort}`)) {
-                const redirectUrl = `http://127.0.0.1:${localServerPort}/main.js?source=${encodeURIComponent(details.url)}`;
+                const redirectUrl = `https://127.0.0.1:${localServerPort}/main.js?source=${encodeURIComponent(details.url)}`;
                 console.log(`[Debug] Redirecting main.js request to local patch server: ${redirectUrl}`);
                 callback({ redirectURL: redirectUrl });
                 return;
