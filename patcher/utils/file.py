@@ -150,3 +150,30 @@ def resign_macos_bundle(main_js_path):
         )
     except FileNotFoundError:
         pass
+
+
+def resign_macos_binary(path):
+    """Переподписывает standalone-бинарь ad-hoc подписью после его модификации.
+
+    На Apple Silicon macOS немедленно SIGKILL-ит процесс, если code signature
+    не совпадает с содержимым. codesign --force --sign - заменяет Developer ID
+    подпись на ad-hoc (signing identity «-»), чего достаточно для локального запуска.
+    """
+    import sys
+    if sys.platform != "darwin":
+        return
+
+    from patcher.utils.console import info, ok, warn
+
+    real = os.path.realpath(path)
+    info(f"Re-signing {os.path.basename(real)} (ad-hoc)...")
+    try:
+        subprocess.run(
+            ["codesign", "--force", "--sign", "-", real],
+            check=True, capture_output=True, text=True,
+        )
+        ok("Ad-hoc signature applied")
+    except FileNotFoundError:
+        warn("codesign not found — install Xcode Command Line Tools")
+    except subprocess.CalledProcessError as e:
+        warn(f"codesign failed: {(e.stderr or '').strip()}")

@@ -1,6 +1,7 @@
 import os
 import re
 import mmap
+import struct
 import shutil
 import contextlib
 import filecmp
@@ -22,6 +23,7 @@ from patcher.utils.file import (
     format_bytes,
     fix_posix_permissions,
     resign_macos_bundle,
+    resign_macos_binary,
 )
 from patcher.utils.admin import terminate_processes
 
@@ -54,9 +56,9 @@ class Gate:
         return ("unpatched", m.start() + self.offset)
 
 
-# agy's handleAuthResult гейтит косметический "Eligibility Check" на серверном
-# AuthResult.hasValidAuth (байт +8):  test rax,rax ; je ; cmp byte[rax+8],0 ; jne.
-# Переписываем compare на `test rax,rax`+nop -> ZF=0 -> jne всегда берёт eligible.
+# x86-64 (Intel Mac / Windows): handleAuthResult проверяет AuthResult.hasValidAuth
+# (байт +8): test rax,rax ; je ; cmp byte[rax+8],0 ; jne.
+# Патч: заменяем compare на test rax,rax + nop → ZF=0 → jne всегда берёт eligible.
 CLI_GATE = Gate(
     rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85....",
     rb"\x48\x85\xc0\x0f\x84....\x48\x85\xc0\x90\x0f\x85....",
@@ -64,6 +66,43 @@ CLI_GATE = Gate(
     offset=9,
     desc="eligibility screen off",
 )
+
+# ARM64 (Apple Silicon): handleAuthResult проверяет поле ServerBackend+0x1b0
+# (ineligibility-объект): ldr x3,[x0,#0x1b0] ; cbz x3,skip ; mov x0,x3 ; …
+# Патч: заменяем ldr на mov x3,xzr → cbz всегда берёт skip → ineligible-экран не вызывается.
+ARM64_CLI_GATE = Gate(
+    rb"\x03\xd8\x40\xf9...\xb4\xe0\x03\x03\xaa\xe1\x03\x1f\xaa\xe2\x03\x1f\xaa",
+    rb"\xe3\x03\x1f\xaa...\xb4\xe0\x03\x03\xaa\xe1\x03\x1f\xaa\xe2\x03\x1f\xaa",
+    b"\xe3\x03\x1f\xaa",
+    offset=0,
+    desc="eligibility screen off (arm64)",
+)
+
+
+def _detect_arch(path):
+    """Возвращает 'arm64', 'x86_64' или 'unknown' по заголовку бинаря."""
+    try:
+        with open(path, "rb") as f:
+            hdr = f.read(8)
+        if len(hdr) < 8:
+            return "unknown"
+        magic = hdr[:4]
+        if magic == b"\xcf\xfa\xed\xfe":          # Mach-O 64-bit LE
+            cputype = struct.unpack_from("<I", hdr, 4)[0]
+            if cputype == 0x0100000C:
+                return "arm64"
+            if cputype == 0x01000007:
+                return "x86_64"
+        elif hdr[:2] == b"MZ":                    # Windows PE → всегда x86_64
+            return "x86_64"
+    except OSError:
+        pass
+    return "unknown"
+
+
+def _gate_for(path):
+    """Выбирает Gate под архитектуру бинаря."""
+    return ARM64_CLI_GATE if _detect_arch(path) == "arm64" else CLI_GATE
 
 
 @contextlib.contextmanager
@@ -95,9 +134,10 @@ def get_status(path):
     if not path or not os.path.isfile(path):
         return ("unknown", None)
     try:
+        gate = _gate_for(path)
         with _mapped(path) as d:
             try:
-                return (CLI_GATE.find(d)[0], None)
+                return (gate.find(d)[0], None)
             except LookupError:
                 return ("unknown", None)
     except OSError:
@@ -139,6 +179,7 @@ def do_patch_agy(path):
     hint(f"Size: {color(format_bytes(file_size(path)), COLOR_CYAN)}")
     print()
 
+    gate = _gate_for(path)
     write_success = False
     off = 0
     for attempt in range(2):
@@ -157,7 +198,7 @@ def do_patch_agy(path):
         try:
             with _mapped(path) as d:
                 try:
-                    kind, off = CLI_GATE.find(d)
+                    kind, off = gate.find(d)
                 except LookupError as e:
                     err(f"{e}")
                     return
@@ -173,7 +214,7 @@ def do_patch_agy(path):
         try:
             with open(path, "r+b") as f:
                 f.seek(off)
-                f.write(CLI_GATE.fix)
+                f.write(gate.fix)
                 f.flush()
                 os.fsync(f.fileno())
             write_success = True
@@ -196,12 +237,13 @@ def do_patch_agy(path):
 
     hash_after = file_hash(path)
     resign_macos_bundle(path)
+    resign_macos_binary(path)
     print()
-    step("Patch agy binary", True, CLI_GATE.desc)
+    step("Patch agy binary", True, gate.desc)
     print()
     panel_rows = [
         ("Target", os.path.basename(path)),
-        ("Gate", f"{CLI_GATE.desc} @ 0x{off:x}"),
+        ("Gate", f"{gate.desc} @ 0x{off:x}"),
     ]
     if hash_before and hash_after:
         panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
