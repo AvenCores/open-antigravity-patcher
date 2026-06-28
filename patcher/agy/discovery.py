@@ -45,9 +45,15 @@ def _win_candidate_dirs():
 
 def _posix_candidate_dirs():
     """Каталоги поиска бинаря agy на POSIX."""
-    out = ["/usr/local/bin", "/usr/bin", "/opt/antigravity/bin",
-           "/opt/antigravity", os.path.expanduser("~/.local/bin"),
-           os.path.expanduser("~/bin")]
+    from patcher.utils.file import get_posix_invoking_user_home
+    user_home = get_posix_invoking_user_home()
+    out = ["/usr/local/bin", "/usr/bin", "/opt/antigravity/bin", "/opt/antigravity"]
+    if user_home:
+        out.append(os.path.join(user_home, ".local/bin"))
+        out.append(os.path.join(user_home, "bin"))
+    else:
+        out.append(os.path.expanduser("~/.local/bin"))
+        out.append(os.path.expanduser("~/bin"))
     return [p for p in out if p and os.path.isdir(p)]
 
 
@@ -67,6 +73,9 @@ def _win_find():
 
 def _posix_find():
     cands = []
+    local_agy = os.path.join(os.getcwd(), "agy")
+    if os.path.isfile(local_agy):
+        cands.append(local_agy)
     w = shutil.which("agy")
     if w:
         cands.append(w)
