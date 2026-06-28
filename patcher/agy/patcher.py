@@ -127,7 +127,9 @@ def _make_backup(path):
 
 
 def _copy_to_user_bin(path):
-    dest_dir = os.path.expanduser("~/.local/bin")
+    from patcher.utils.file import get_posix_invoking_user_home
+    user_home = get_posix_invoking_user_home()
+    dest_dir = os.path.join(user_home, ".local", "bin") if user_home else os.path.expanduser("~/.local/bin")
     dest_path = os.path.join(dest_dir, "agy")
     if os.path.abspath(path) == os.path.abspath(dest_path):
         return
