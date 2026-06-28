@@ -126,6 +126,26 @@ def _make_backup(path):
     ok(f"Backup: {os.path.basename(bak)} ({format_bytes(file_size(bak))})")
 
 
+def _copy_to_user_bin(path):
+    dest_dir = os.path.expanduser("~/.local/bin")
+    dest_path = os.path.join(dest_dir, "agy")
+    if os.path.abspath(path) == os.path.abspath(dest_path):
+        return
+    info(f"Storing file in user system folder -> {dest_path}")
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+        if os.path.exists(dest_path):
+            try:
+                os.remove(dest_path)
+            except Exception:
+                pass
+        shutil.copy2(path, dest_path)
+        os.chmod(dest_path, 0o755)
+        ok(f"File successfully copied to: {dest_path}")
+    except Exception as e:
+        warn(f"Could not copy file to {dest_path}: {e}")
+
+
 def do_patch_agy(path):
     from patcher.cli import confirmed
 
@@ -163,6 +183,8 @@ def do_patch_agy(path):
                     return
                 if kind == "patched":
                     hint("agy already patched — nothing to do.")
+                    if os.name == "posix":
+                        _copy_to_user_bin(path)
                     return
         except OSError as e:
             err(f"Read error: {e}")
@@ -177,6 +199,7 @@ def do_patch_agy(path):
                 f.flush()
                 os.fsync(f.fileno())
             write_success = True
+            break
         except PermissionError as e:
             if attempt == 0:
                 warn(f"Permission denied (file locked): {e}")
@@ -196,6 +219,8 @@ def do_patch_agy(path):
 
     hash_after = file_hash(path)
     resign_macos_bundle(path)
+    if os.name == "posix":
+        _copy_to_user_bin(path)
     print()
     step("Patch agy binary", True, CLI_GATE.desc)
     print()
@@ -247,6 +272,8 @@ def do_restore_agy(path):
 
     hash_after = file_hash(path)
     resign_macos_bundle(path)
+    if os.name == "posix":
+        _copy_to_user_bin(path)
     print()
     panel_rows = [("Target", os.path.basename(path))]
     if hash_before and hash_after and hash_before != hash_after:

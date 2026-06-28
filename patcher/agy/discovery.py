@@ -67,6 +67,9 @@ def _win_find():
 
 def _posix_find():
     cands = []
+    local_agy = os.path.join(os.getcwd(), "agy")
+    if os.path.isfile(local_agy):
+        cands.append(local_agy)
     w = shutil.which("agy")
     if w:
         cands.append(w)
