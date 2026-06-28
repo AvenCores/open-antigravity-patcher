@@ -21,7 +21,7 @@ from patcher.utils.file import (
     file_size,
     format_bytes,
     fix_posix_permissions,
-    resign_macos_bundle,
+    resign_macos_binary,
 )
 from patcher.utils.admin import terminate_processes
 
@@ -220,7 +220,7 @@ def do_patch_agy(path):
         return
 
     hash_after = file_hash(path)
-    resign_macos_bundle(path)
+    resign_macos_binary(path)
     if os.name == "posix":
         _copy_to_user_bin(path)
     print()
@@ -273,7 +273,7 @@ def do_restore_agy(path):
         return
 
     hash_after = file_hash(path)
-    resign_macos_bundle(path)
+    resign_macos_binary(path)
     if os.name == "posix":
         _copy_to_user_bin(path)
     print()
