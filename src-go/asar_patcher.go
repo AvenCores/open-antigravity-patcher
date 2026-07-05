@@ -461,7 +461,8 @@ func packAsar(sourceDir, asarPath, referenceAsarPath string) bool {
 func findAntigravityRoot() string {
 	var candidates []string
 
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		macCandidates := []string{
 			"/Applications/Antigravity.app",
 			filepath.Join(getPosixInvokingUserHome(), "Applications/Antigravity.app"),
@@ -473,7 +474,7 @@ func findAntigravityRoot() string {
 				candidates = append(candidates, app)
 			}
 		}
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		candidates = append(candidates,
 			"/usr/share/antigravity",
 			"/opt/Antigravity",
@@ -481,7 +482,7 @@ func findAntigravityRoot() string {
 			"/usr/local/share/antigravity",
 			"/usr/local/share/Antigravity",
 		)
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		localAppData := os.Getenv("LOCALAPPDATA")
 		if localAppData != "" {
 			candidates = append(candidates, filepath.Join(localAppData, "Programs", "Antigravity"))
@@ -832,10 +833,9 @@ func doPatchAntigravity(antigravityRoot string) {
 			if getuid() == 0 {
 				sudoUID := os.Getenv("SUDO_UID")
 				sudoGID := os.Getenv("SUDO_GID")
-				sudoUser := os.Getenv("SUDO_USER")
 				if sudoUID != "" && sudoGID != "" {
 					// In Go, dropping privileges on cmd can be done using SysProcAttr on Linux
-					setCmdUser(cmd, sudoUID, sudoGID, sudoUser)
+					setCmdUser(cmd, sudoUID, sudoGID)
 				}
 			}
 		}

@@ -21,7 +21,7 @@ func getuid() int {
 	return os.Getuid()
 }
 
-func setCmdUser(cmd *exec.Cmd, uidStr, gidStr, userStr string) {
+func setCmdUser(cmd *exec.Cmd, uidStr, gidStr string) {
 	uid, err1 := strconv.Atoi(uidStr)
 	gid, err2 := strconv.Atoi(gidStr)
 	if err1 == nil && err2 == nil {

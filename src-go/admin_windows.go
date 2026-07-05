@@ -53,7 +53,7 @@ func getuid() int {
 	return -1
 }
 
-func setCmdUser(cmd *exec.Cmd, uidStr, gidStr, userStr string) {
+func setCmdUser(cmd *exec.Cmd, uidStr, gidStr string) {
 	// No-op on Windows
 }
 

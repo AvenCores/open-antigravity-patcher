@@ -230,7 +230,8 @@ func containsString(arr []string, s string) bool {
 func findInstallRoot() string {
 	var candidates []string
 
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		macCandidates := []string{
 			"/Applications/Antigravity IDE.app",
 			filepath.Join(getPosixInvokingUserHome(), "Applications/Antigravity IDE.app"),
@@ -240,7 +241,7 @@ func findInstallRoot() string {
 		for _, app := range macCandidates {
 			candidates = append(candidates, filepath.Join(app, "Contents", "Resources", "app"))
 		}
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		candidates = append(candidates,
 			"/usr/share/antigravity-ide",
 			"/opt/Antigravity IDE",
@@ -248,7 +249,7 @@ func findInstallRoot() string {
 			"/opt/antigravity ide",
 			"/opt/Antigravity IDE/resources/app/out",
 		)
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		localAppData := os.Getenv("LOCALAPPDATA")
 		if localAppData != "" {
 			candidates = append(candidates, filepath.Join(localAppData, "Programs", "Antigravity IDE"))
@@ -723,7 +724,7 @@ func warnAboutUnsafeBackup(mainJsPath string) (bool, bool) {
 	return true, warnings
 }
 
-func doPatch(mainJsPath string, showSearchLine bool) {
+func doPatch(mainJsPath string) {
 	if fi, err := os.Stat(mainJsPath); err != nil || fi.IsDir() {
 		errLine := "Target is not a file: " + mainJsPath
 		if err != nil {
@@ -735,19 +736,20 @@ func doPatch(mainJsPath string, showSearchLine bool) {
 	}
 
 	verStatus, verStr := checkAgVersion(mainJsPath)
-	if verStatus == VersionStatusTooOld {
+	switch verStatus {
+	case VersionStatusTooOld:
 		consoleErr("Unsupported version: " + verStr)
 		consoleErr("Minimum required: " + MinAgVersion)
 		hint("Please update Antigravity IDE and try again.")
 		if !confirmed("Proceed anyway?") {
 			return
 		}
-	} else if verStatus == VersionStatusNotFound {
+	case VersionStatusNotFound:
 		warn("Could not detect Antigravity IDE version (registry key or package.json not found).")
 		if !confirmed("Proceed without version check?") {
 			return
 		}
-	} else if verStatus == VersionStatusParseError {
+	case VersionStatusParseError:
 		warn("Could not parse version string: " + verStr)
 		if !confirmed("Proceed anyway?") {
 			return

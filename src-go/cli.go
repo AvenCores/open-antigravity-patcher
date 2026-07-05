@@ -339,7 +339,7 @@ func runCli() {
 		switch choice {
 		case "1":
 			if mainJsPath != "" {
-				doPatch(mainJsPath, searched)
+				doPatch(mainJsPath)
 			} else {
 				consoleErr("Antigravity IDE path is not set. Please select custom path (Option 9) first.")
 			}
@@ -401,7 +401,8 @@ func runCli() {
 					break
 				}
 
-				if subChoice == "1" {
+				switch subChoice {
+				case "1":
 					fmt.Println()
 					hint("Enter the path to Antigravity IDE folder or main.js file.")
 					printPathExamples()
@@ -417,7 +418,7 @@ func runCli() {
 						}
 					}
 					pauseMenu()
-				} else if subChoice == "2" {
+				case "2":
 					fmt.Println()
 					hint("Enter the path to Antigravity folder.")
 					printPathExamples()
@@ -433,7 +434,7 @@ func runCli() {
 						}
 					}
 					pauseMenu()
-				} else if subChoice == "3" {
+				case "3":
 					fmt.Println()
 					hint("Enter the path to the agy binary (agy.exe) or its folder.")
 					printPathExamples()
