@@ -772,6 +772,9 @@ func doPatchAntigravity(antigravityRoot string) {
 	}
 
 	tempDir := os.TempDir()
+	if resolved, err := filepath.EvalSymlinks(tempDir); err == nil {
+		tempDir = resolved
+	}
 	destFolder := filepath.Join(tempDir, "ag_patcher_temp")
 
 	if _, err := os.Stat(destFolder); err == nil {
@@ -822,17 +825,18 @@ func doPatchAntigravity(antigravityRoot string) {
 
 		cmd := exec.Command(exePath)
 		cmd.Dir = antigravityRoot
-		// Setup environment
-		cmd.Env = os.Environ()
 
 		// On POSIX, drop root privileges if we ran with sudo
-		if runtime.GOOS != "windows" && getuid() == 0 {
-			sudoUID := os.Getenv("SUDO_UID")
-			sudoGID := os.Getenv("SUDO_GID")
-			sudoUser := os.Getenv("SUDO_USER")
-			if sudoUID != "" && sudoGID != "" {
-				// In Go, dropping privileges on cmd can be done using SysProcAttr on Linux
-				setCmdUser(cmd, sudoUID, sudoGID, sudoUser)
+		if runtime.GOOS != "windows" {
+			cmd.Env = os.Environ()
+			if getuid() == 0 {
+				sudoUID := os.Getenv("SUDO_UID")
+				sudoGID := os.Getenv("SUDO_GID")
+				sudoUser := os.Getenv("SUDO_USER")
+				if sudoUID != "" && sudoGID != "" {
+					// In Go, dropping privileges on cmd can be done using SysProcAttr on Linux
+					setCmdUser(cmd, sudoUID, sudoGID, sudoUser)
+				}
 			}
 		}
 
@@ -887,7 +891,11 @@ func doPatchAntigravity(antigravityRoot string) {
 			}
 
 			info("Stopping the application...")
-			cmd.Process.Signal(os.Interrupt)
+			if runtime.GOOS == "windows" {
+				cmd.Process.Kill()
+			} else {
+				cmd.Process.Signal(os.Interrupt)
+			}
 			// Wait with timeout
 			done := make(chan error, 1)
 			go func() {
@@ -897,8 +905,10 @@ func doPatchAntigravity(antigravityRoot string) {
 			case <-done:
 				// finished
 			case <-time.After(5 * time.Second):
-				warn("Forcing application to stop...")
-				cmd.Process.Kill()
+				if runtime.GOOS != "windows" {
+					warn("Forcing application to stop...")
+					cmd.Process.Kill()
+				}
 			}
 		} else {
 			verifiedOk = false
@@ -947,6 +957,9 @@ func doRestoreAntigravity(antigravityRoot string) {
 		}
 
 		tempDir := os.TempDir()
+		if resolved, err := filepath.EvalSymlinks(tempDir); err == nil {
+			tempDir = resolved
+		}
 		destFolder := filepath.Join(tempDir, "ag_patcher_temp")
 		if _, err := os.Stat(destFolder); err == nil {
 			os.RemoveAll(destFolder)
