@@ -114,14 +114,16 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
     }
 
     // Redirect renderer console messages to main process logs
-    try {
-        electron_1.app.on('web-contents-created', (event, webContents) => {
-            webContents.on('console-message', (ev, level, message, line, sourceId) => {
-                console.log(`[Renderer Console] ${message} (${sourceId}:${line})`);
+    if (process.env.AG_VERBOSE || process.env.AG_DEBUG || process.env.OPEN_ANTIGRAVITY_DEBUG) {
+        try {
+            electron_1.app.on('web-contents-created', (event, webContents) => {
+                webContents.on('console-message', (ev, level, message, line, sourceId) => {
+                    console.log(`[Renderer Console] ${message} (${sourceId}:${line})`);
+                });
             });
-        });
-    } catch (err) {
-        console.error('[Debug] Failed to redirect renderer console:', err);
+        } catch (err) {
+            console.error('[Debug] Failed to redirect renderer console:', err);
+        }
     }
 
     // Start local frontend patch server
@@ -259,11 +261,15 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
         console.error('[Debug] Failed to start local patch server:', err);
     }
     electron_1.session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-        console.log(`[Network Request] ${details.url}`);
+        if (process.env.AG_VERBOSE || process.env.AG_DEBUG || process.env.OPEN_ANTIGRAVITY_DEBUG) {
+            console.log(`[Network Request] ${details.url}`);
+        }
         if (details.url.endsWith('/main.js') && details.url.includes('127.0.0.1')) {
             if (localServerPort && !details.url.includes(`:${localServerPort}`)) {
                 const redirectUrl = `https://127.0.0.1:${localServerPort}/main.js?source=${encodeURIComponent(details.url)}`;
-                console.log(`[Debug] Redirecting main.js request to local patch server: ${redirectUrl}`);
+                if (process.env.AG_VERBOSE || process.env.AG_DEBUG || process.env.OPEN_ANTIGRAVITY_DEBUG) {
+                    console.log(`[Debug] Redirecting main.js request to local patch server: ${redirectUrl}`);
+                }
                 callback({ redirectURL: redirectUrl });
                 return;
             }

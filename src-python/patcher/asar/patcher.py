@@ -129,7 +129,7 @@ def do_patch_antigravity(antigravity_root):
     else:
         hint(f"Backup of original ASAR already exists: {os.path.basename(source_asar_path)}")
 
-    temp_dir = tempfile.gettempdir()
+    temp_dir = os.path.realpath(tempfile.gettempdir())
     dest_folder = os.path.join(temp_dir, "ag_patcher_temp")
 
     if os.path.exists(dest_folder):
@@ -282,7 +282,7 @@ def do_restore_antigravity(antigravity_root):
             err(f"Target ASAR file not found: {asar_path}")
             return
 
-        temp_dir = tempfile.gettempdir()
+        temp_dir = os.path.realpath(tempfile.gettempdir())
         dest_folder = os.path.join(temp_dir, "ag_patcher_temp")
 
         if os.path.exists(dest_folder):

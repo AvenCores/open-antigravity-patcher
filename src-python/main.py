@@ -8,7 +8,7 @@ from patcher.cli import run_cli, confirmed
 
 if __name__ == "__main__":
     setup_console()
-    if os.name == "nt" and not is_admin():
+    if os.name == "nt" and os.environ.get("SKIP_ELEVATION") != "1" and not is_admin():
         if run_as_admin():
             sys.exit(0)
         else:

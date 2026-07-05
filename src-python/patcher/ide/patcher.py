@@ -292,17 +292,17 @@ def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_c
     current_size = file_size(main_js_path)
     warnings = []
 
-    try:
-        with open(backup_path, "r", encoding="utf-8") as f:
-            backup_content = f.read()
-    except Exception as e:
-        warn(f"Backup check error: {e}")
-        return False, False
-
-    if backup_size <= 2048 or len(backup_content.strip()) <= 512:
-        warnings.append(
-            f"backup size is only {format_bytes(backup_size)} and it looks almost empty"
-        )
+    if backup_size <= 2048:
+        try:
+            with open(backup_path, "r", encoding="utf-8") as f:
+                backup_content = f.read()
+            if len(backup_content.strip()) <= 512:
+                warnings.append(
+                    f"backup size is only {format_bytes(backup_size)} and it looks almost empty"
+                )
+        except Exception as e:
+            warn(f"Backup check error: {e}")
+            return False, False
     elif backup_size < 4096 or (current_size > 0 and backup_size < current_size // 10):
         warnings.append(
             f"backup is much smaller than expected "
