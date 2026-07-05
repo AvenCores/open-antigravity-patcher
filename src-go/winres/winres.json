@@ -1,0 +1,45 @@
+{
+  "RT_GROUP_ICON": {
+    "APP": {
+      "0000": "../icon.ico"
+    }
+  },
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": {
+          "name": "avencores.open_ag_patcher",
+          "version": "1.1.8.0"
+        },
+        "description": "Open AG Patcher",
+        "minimum-os": "win7",
+        "execution-level": "require administrator",
+        "ui-access": false,
+        "auto-elevate": false,
+        "dpi-awareness": "system"
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "1.1.8.0",
+          "product_version": "1.1.8.0"
+        },
+        "info": {
+          "0409": {
+            "CompanyName": "avencores",
+            "FileDescription": "Open AG Patcher",
+            "FileVersion": "1.1.8",
+            "InternalName": "open_ag_patcher",
+            "LegalCopyright": "© 2026",
+            "OriginalFilename": "Open_AG_Patcher_Windows.exe",
+            "ProductName": "Open AG Patcher",
+            "ProductVersion": "1.1.8"
+          }
+        }
+      }
+    }
+  }
+}

@@ -460,16 +460,19 @@ xcode-select --install
 
 ## 🛠️ Сборка
 
+### 🐍 Сборка Python-версии
 Для сборки исполняемых файлов рекомендуется использовать виртуальное окружение:
 
 1. **Создание и активация виртуального окружения:**
    * **Windows:**
      ```bash
+     cd src-python
      python -m venv .venv
      .venv\Scripts\activate
      ```
    * **Linux / macOS:**
      ```bash
+     cd src-python
      python3 -m venv .venv
      source .venv/bin/activate
      ```
@@ -493,18 +496,55 @@ xcode-select --install
      pyinstaller --onefile --name="Open_AG_Patcher_macOS" --target-arch universal2 --hidden-import=packaging --hidden-import=packaging.version --hidden-import=packaging.specifiers --hidden-import=packaging.requirements main.py
      ```
 
+### 🐹 Сборка Go-версии
+Для сборки Go-версии вам потребуется установленный Go (Golang) версии 1.20+.
+
+Перейдите в папку Go-проекта:
+```bash
+cd src-go
+```
+
+* **На Windows**:
+  Запустите:
+  ```cmd
+  build.bat
+  ```
+  Скрипт автоматически проверит и при необходимости установит `go-winres` для сборки иконки и метаданных Windows, а затем скомпилирует бинарники под все платформы (Windows x64/x86, Linux, macOS) в папку `dist/`.
+
+* **На Linux / macOS**:
+  Запустите:
+  ```bash
+  chmod +x build.sh
+  ./build.sh
+  ```
+  Скрипт скомпилирует бинарники под все платформы в папку `dist/`.
+
 ## Структура проекта
-- `main.py` — основная точка входа в патчер (выполняет проверку прав доступа и запуск CLI).
-- `patcher/` — основной исходный код патчера с модульной архитектурой:
+
+Проект разделен на две независимые реализации:
+
+### 🐍 Python-версия (`src-python/`)
+Оригинальная реализация патчера на Python с использованием PyInstaller для сборки.
+- `src-python/main.py` — основная точка входа в патчер (выполняет проверку прав доступа и запуск CLI).
+- `src-python/patcher/` — основной исходный код патчера с модульной архитектурой:
   - `constants.py` — глобальные константы, регулярные выражения, версии и шаблоны инъекций.
   - `cli.py` — консольный интерфейс пользователя, меню и обработка ввода.
   - `utils/` — системные вспомогательные утилиты (цвета консоли, права администратора, POSIX-права, хэширование файлов).
   - `ide/` — логика поиска и патчинга непосредственно Antigravity IDE (файлы `main.js`).
   - `asar/` — логика распаковки/упаковки архивов ASAR и патчинга приложения Antigravity.
   - `agy/` — логика поиска и байт-сигнатурного патчинга бинаря Antigravity CLI (`agy`/`agy.exe`).
-- `requirements.txt` — зависимости для сборки и запуска.
-- `build.txt` — примеры команд сборки под разные ОС.
-- `icon.ico` — иконка для `exe`/`app`.
+- `src-python/requirements.txt` — зависимости для сборки и запуска.
+- `src-python/build.txt` — примеры команд сборки под разные ОС.
+- `src-python/icon.ico` — иконка для `exe`/`app`.
+
+### 🐹 Go-версия (`src-go/`)
+Портированная native Go-версия, которая работает быстрее, не требует Python-окружения и компилируется в один независимый исполняемый файл под каждую ОС.
+- `src-go/main.go` — точка входа Go-патчера.
+- `src-go/cli.go`, `src-go/constants.go`, `src-go/*_patcher.go` — логика патчинга, аналогичная Python-версии.
+- `src-go/winres/` — ресурсы Windows (иконка, манифест прав UAC, версия).
+- `src-go/build.bat` — кросс-компиляция из Windows под все платформы.
+- `src-go/build.sh` — кросс-компиляция из Unix/Linux/macOS под все платформы.
+- `src-go/icon.ico` — иконка для сборки Windows-ресурсов.
 
 # 📜 Лицензия
 

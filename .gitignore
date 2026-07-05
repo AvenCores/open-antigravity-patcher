@@ -1,10 +1,21 @@
+# Environments
 .env/
-dist/
-build/
-Open AG Patcher.spec
-Open_AG_Patcher_Windows.spec
-Open_AG_Patcher_Linux.spec
-Open_AG_Patcher_macOS*.spec
-__pycache__
+.venv/
+src-python/.env/
+src-python/.venv/
+
+# Python builds and caches
+src-python/build/
+src-python/dist/
+src-python/__pycache__/
+src-python/patcher/**/__pycache__/
+src-python/*.spec
+
+# Go builds and resources
+src-go/dist/
+src-go/rsrc_windows_*.syso
+
+# Temporary local app files
 main.js
 app/
+app_original.asar
