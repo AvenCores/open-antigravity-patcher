@@ -723,7 +723,7 @@ func warnAboutUnsafeBackup(mainJsPath string) (bool, bool) {
 	return true, warnings
 }
 
-func doPatch(mainJsPath string) {
+func doPatch(mainJsPath string, showSearchLine bool) {
 	if fi, err := os.Stat(mainJsPath); err != nil || fi.IsDir() {
 		errLine := "Target is not a file: " + mainJsPath
 		if err != nil {
@@ -990,7 +990,7 @@ func copyDir(src string, dst string) error {
 	})
 }
 
-func doRestore(mainJsPath string) {
+func doRestore(mainJsPath string, showSearchLine bool) {
 	okCheck, hasWarnings := warnAboutUnsafeBackup(mainJsPath)
 	if !okCheck {
 		return
@@ -1057,7 +1057,7 @@ func doRestore(mainJsPath string) {
 	hashAfter := fileHash(mainJsPath)
 	resignMacosBundle(mainJsPath)
 
-	redrawMainScreen(mainJsPath, "", "", false)
+	printTargetInfo(mainJsPath, "", "", showSearchLine)
 	fmt.Println()
 
 	var panelRows [][]string

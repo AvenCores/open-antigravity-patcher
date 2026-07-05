@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 )
 
 func readConsoleLine(prompt string) string {
@@ -74,7 +73,12 @@ func printTargetInfo(mainJsPath, antigravityRoot, agyPath string, showSearchLine
 					verColor = ColorGreen
 				}
 				kv("Version:", verText, verColor)
-				kv("Size:", formatBytes(fi.Size()), ColorGreen)
+
+				sizeColor := ColorGreen
+				if fi.Size() <= 0 {
+					sizeColor = ColorYellow
+				}
+				kv("Size:", formatBytes(fi.Size()), sizeColor)
 			}
 		} else {
 			kv("Status:", "not found", ColorRed)
@@ -113,7 +117,12 @@ func printTargetInfo(mainJsPath, antigravityRoot, agyPath string, showSearchLine
 					verColor = ColorGreen
 				}
 				kv("Version:", verText, verColor)
-				kv("Size:", formatBytes(asarFi.Size()), ColorGreen)
+
+				sizeColor := ColorGreen
+				if asarFi.Size() <= 0 {
+					sizeColor = ColorYellow
+				}
+				kv("Size:", formatBytes(asarFi.Size()), sizeColor)
 			} else {
 				kv("Status:", "ASAR missing", ColorRed)
 			}
@@ -143,7 +152,12 @@ func printTargetInfo(mainJsPath, antigravityRoot, agyPath string, showSearchLine
 				patchedColor = ColorYellow
 			}
 			kv("Patch:", patchedText, patchedColor)
-			kv("Size:", formatBytes(fi.Size()), ColorGreen)
+
+			sizeColor := ColorGreen
+			if fi.Size() <= 0 {
+				sizeColor = ColorYellow
+			}
+			kv("Size:", formatBytes(fi.Size()), sizeColor)
 		} else {
 			kv("Status:", "not found", ColorYellow)
 		}
@@ -273,113 +287,178 @@ func runCli() {
 	}
 
 	redrawMainScreen(mainJsPath, antigravityRoot, agyPath, searched)
-	searched = false // only print once
 
 	for {
 		printMenuSection("PATCH")
-		printMenuRow("1", "Antigravity IDE patch", "Apply / enable bypass", ColorGreen)
-		printMenuRow("2", "Antigravity patch", "Patch app.asar proxy", ColorGreen)
-		printMenuRow("3", "Antigravity CLI (agy) patch", "Bypass eligibility check", ColorGreen)
+		printMenuRow("1", "Antigravity IDE patch", "bypass region lock", ColorGreen)
+		printMenuRow("2", "Antigravity patch", "unlock full app", ColorGreen)
+		printMenuRow("3", "Antigravity CLI (agy) patch", "unlock agy tool", ColorGreen)
 
 		printMenuSection("RESTORE")
-		printMenuRow("4", "Antigravity IDE", "Restore main.js backup", ColorYellow)
-		printMenuRow("5", "Antigravity", "Restore app.asar backup", ColorYellow)
-		printMenuRow("6", "Antigravity CLI", "Restore agy binary backup", ColorYellow)
+		printMenuRow("4", "Antigravity IDE", "from backup", ColorYellow)
+		printMenuRow("5", "Antigravity", "from backup", ColorYellow)
+		printMenuRow("6", "Antigravity CLI", "from backup", ColorYellow)
 
 		printMenuSection("TOOLS")
-		printMenuRow("7", "Fix HTTP 429", "Reset user configuration", ColorCyan)
-		printMenuRow("8", "Open GitHub repository", "Open project page", ColorCyan)
-		printMenuRow("9", "Select custom path", "Assign folder manually", ColorCyan)
+		printMenuRow("7", "Fix HTTP 429", "rate-limit / too many requests", ColorCyan)
+		printMenuRow("8", "Open GitHub repository", "source & updates", ColorCyan)
+		printMenuRow("9", "Select custom path", "override auto-detected target", ColorCyan)
 
-		printMenuDivider()
-		printMenuRow("0", "Exit", "", ColorRed)
-		printMenuFooter("")
-
-		choice := strings.TrimSpace(readConsoleLine(color("\n  Select > ", ColorCyan, ColorBold)))
 		fmt.Println()
+		printMenuRow("0", "Exit", "quit the patcher", ColorRed)
+		printMenuFooter("Tip: patches are reversible — use RESTORE any time.")
+
+		choice := strings.TrimSpace(readConsoleLine(color("\n  Select option > ", ColorCyan, ColorBold)))
+		fmt.Println()
+
+		if choice == "0" {
+			return
+		}
+
+		// Empty input — do not exit, just redraw menu
+		if choice == "" {
+			redrawMainScreen(mainJsPath, antigravityRoot, agyPath, searched)
+			continue
+		}
+
+		validChoices := map[string]bool{
+			"1": true, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true, "8": true, "9": true,
+		}
+		if !validChoices[choice] {
+			consoleErr("Invalid choice")
+			fmt.Println()
+			pauseMenu()
+			redrawMainScreen(mainJsPath, antigravityRoot, agyPath, searched)
+			continue
+		}
+
+		handled := true
+		clearScreen()
+		printBanner()
 
 		switch choice {
 		case "1":
 			if mainJsPath != "" {
-				doPatch(mainJsPath)
+				doPatch(mainJsPath, searched)
 			} else {
-				consoleErr("Antigravity IDE main.js path not assigned.")
-				printLaunchExamples()
+				consoleErr("Antigravity IDE path is not set. Please select custom path (Option 9) first.")
 			}
-			pauseMenu()
 		case "2":
 			if antigravityRoot != "" {
 				doPatchAntigravity(antigravityRoot)
 			} else {
-				consoleErr("Antigravity installation root not assigned.")
+				consoleErr("Antigravity path is not set. Please select custom path (Option 9) first.")
 			}
-			pauseMenu()
 		case "3":
 			if agyPath != "" {
 				doPatchAgy(agyPath)
 			} else {
-				consoleErr("Antigravity CLI (agy) binary path not assigned.")
+				consoleErr("Antigravity CLI path is not set. Please select custom path (Option 9) first.")
 			}
-			pauseMenu()
 		case "4":
 			if mainJsPath != "" {
-				doRestore(mainJsPath)
+				doRestore(mainJsPath, searched)
 			} else {
-				consoleErr("Antigravity IDE main.js path not assigned.")
+				consoleErr("Antigravity IDE path is not set. Please select custom path (Option 9) first.")
 			}
-			pauseMenu()
 		case "5":
 			if antigravityRoot != "" {
 				doRestoreAntigravity(antigravityRoot)
 			} else {
-				consoleErr("Antigravity installation root not assigned.")
+				consoleErr("Antigravity path is not set. Please select custom path (Option 9) first.")
 			}
-			pauseMenu()
 		case "6":
 			if agyPath != "" {
 				doRestoreAgy(agyPath)
 			} else {
-				consoleErr("Antigravity CLI (agy) binary path not assigned.")
+				consoleErr("Antigravity CLI path is not set. Please select custom path (Option 9) first.")
 			}
-			pauseMenu()
 		case "7":
 			doFix429()
-			pauseMenu()
 		case "8":
-			info("Opening browser...")
-			openWebBrowser("https://github.com/AvenCores/open-antigravity-patcher")
-			pauseMenu()
+			printTargetInfo(mainJsPath, antigravityRoot, agyPath, searched)
+			fmt.Println()
+			if confirmed("Open GitHub repository in browser?") {
+				url := "https://github.com/AvenCores/open-antigravity-unlock"
+				openWebBrowser(url)
+				consoleOk(fmt.Sprintf("Opening: %s", color(url, ColorCyan)))
+			} else {
+				cancel("Cancelled.")
+			}
 		case "9":
-			hint("Please enter path to Antigravity IDE, Antigravity, agy, or main.js:")
-			printPathExamples()
-			raw := strings.TrimSpace(readConsoleLine(color("\n  Path > ", ColorCyan, ColorBold)))
-			if raw != "" {
-				newMain, newAg := assignCustomPath(raw)
-				newAgy := resolveAgyPath(raw)
-				if newMain != "" || newAg != "" || newAgy != "" {
-					if newMain != "" {
-						mainJsPath = newMain
+			for {
+				redrawMainScreen(mainJsPath, antigravityRoot, agyPath, searched)
+				printMenuSection("SELECT CUSTOM PATH")
+				printMenuRow("1", "Antigravity IDE path", "folder or main.js", ColorGreen)
+				printMenuRow("2", "Antigravity path", "app folder", ColorGreen)
+				printMenuRow("3", "Antigravity CLI path", "agy.exe or folder", ColorGreen)
+				fmt.Println()
+				printMenuRow("0", "Back", "return to main menu", ColorRed)
+				printMenuFooter("Leaves auto-detection results intact for other targets.")
+
+				subChoice := strings.TrimSpace(readConsoleLine(color("\n  Select option > ", ColorCyan, ColorBold)))
+				if subChoice == "0" {
+					break
+				}
+
+				if subChoice == "1" {
+					fmt.Println()
+					hint("Enter the path to Antigravity IDE folder or main.js file.")
+					printPathExamples()
+					raw := strings.TrimSpace(readConsoleLine(color("\n  IDE Path > ", ColorCyan, ColorBold)))
+					if raw != "" {
+						newMainJs, _ := assignCustomPath(raw)
+						if newMainJs != "" {
+							mainJsPath = newMainJs
+							searched = false
+							consoleOk("Antigravity IDE path updated!")
+						} else {
+							consoleErr("Could not resolve a valid Antigravity IDE target.")
+						}
 					}
-					if newAg != "" {
-						antigravityRoot = newAg
+					pauseMenu()
+				} else if subChoice == "2" {
+					fmt.Println()
+					hint("Enter the path to Antigravity folder.")
+					printPathExamples()
+					raw := strings.TrimSpace(readConsoleLine(color("\n  Antigravity Path > ", ColorCyan, ColorBold)))
+					if raw != "" {
+						_, newAgRoot := assignCustomPath(raw)
+						if newAgRoot != "" {
+							antigravityRoot = newAgRoot
+							searched = false
+							consoleOk("Antigravity path updated!")
+						} else {
+							consoleErr("Could not resolve a valid Antigravity target.")
+						}
 					}
-					if newAgy != "" {
-						agyPath = newAgy
+					pauseMenu()
+				} else if subChoice == "3" {
+					fmt.Println()
+					hint("Enter the path to the agy binary (agy.exe) or its folder.")
+					printPathExamples()
+					raw := strings.TrimSpace(readConsoleLine(color("\n  AGY Path > ", ColorCyan, ColorBold)))
+					if raw != "" {
+						newAgy := resolveAgyPath(raw)
+						if newAgy != "" {
+							agyPath = newAgy
+							searched = false
+							consoleOk("Antigravity CLI path updated!")
+						} else {
+							consoleErr("Could not resolve a valid Antigravity CLI target.")
+						}
 					}
-					consoleOk("Path successfully updated.")
-				} else {
-					consoleErr("Failed to resolve provided path.")
+					pauseMenu()
 				}
 			}
-			pauseMenu()
-		case "0", "exit", "q":
-			info("Exiting...")
-			os.Exit(0)
-		default:
-			consoleErr("Invalid selection. Try again.")
-			time.Sleep(1000 * time.Millisecond)
+			handled = true
 		}
 
-		redrawMainScreen(mainJsPath, antigravityRoot, agyPath, false)
+		fmt.Println()
+
+		if handled {
+			pauseMenu()
+			redrawMainScreen(mainJsPath, antigravityRoot, agyPath, searched)
+		}
 	}
 }
