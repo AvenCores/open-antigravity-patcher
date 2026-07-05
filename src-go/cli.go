@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 )
 
@@ -55,7 +56,7 @@ func printTargetInfo(mainJsPath, antigravityRoot, agyPath string, showSearchLine
 					kv("Status:", "found", ColorGreen)
 					patchedText := "not patched"
 					patchedColor := ColorGreen
-					if isAlreadyPatched(string(data)) {
+					if isAlreadyPatched(data) {
 						patchedText = "already patched"
 						patchedColor = ColorYellow
 					}
@@ -171,6 +172,8 @@ func redrawMainScreen(mainJsPath, antigravityRoot, agyPath string, showSearchLin
 	printBanner()
 	printTargetInfo(mainJsPath, antigravityRoot, agyPath, showSearchLine)
 	fmt.Println()
+	runtime.GC()
+	debug.FreeOSMemory()
 }
 
 func printLaunchExamples() {

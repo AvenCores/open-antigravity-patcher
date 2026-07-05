@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -280,19 +279,17 @@ func getAgyStatus(path string) (string, error) {
 	if path == "" {
 		return "unknown", nil
 	}
-	data, err := os.ReadFile(path)
+
+	gate := gateFor(path)
+	patchedMatches, sigMatches, err := findPatternsInFile(path, gate)
 	if err != nil {
 		return "unknown", err
 	}
 
-	gate := gateFor(path)
-
-	patchedMatches := findPattern(data, gate.PatchedPrefix, gate.PatchedSuffix, gate.WildcardLen)
 	if len(patchedMatches) > 0 {
 		return "patched", nil
 	}
 
-	sigMatches := findPattern(data, gate.SigPrefix, gate.SigSuffix, gate.WildcardLen)
 	if len(sigMatches) > 0 {
 		return "unpatched", nil
 	}
@@ -308,9 +305,9 @@ func isAgyPatched(path string) bool {
 func makeAgyBackup(path string) {
 	bak := path + BakExt
 	if _, err := os.Stat(bak); err == nil {
-		data1, err1 := os.ReadFile(path)
-		data2, err2 := os.ReadFile(bak)
-		if err1 == nil && err2 == nil && bytes.Equal(data1, data2) {
+		hash1 := fileHash(path)
+		hash2 := fileHash(bak)
+		if hash1 != "" && hash1 == hash2 {
 			return
 		}
 		info("Backup is stale (app updated) — refreshing " + filepath.Base(path) + BakExt)
@@ -385,20 +382,18 @@ func doPatchAgy(path string) {
 			return
 		}
 
-		data, err := os.ReadFile(path)
+		patchedMatches, sigMatches, err := findPatternsInFile(path, gate)
 		if err != nil {
 			consoleErr("Read error: " + err.Error())
 			return
 		}
 
-		patchedMatches := findPattern(data, gate.PatchedPrefix, gate.PatchedSuffix, gate.WildcardLen)
 		if len(patchedMatches) > 0 {
 			hint("agy already patched — nothing to do.")
 			copyToUserBin(path)
 			return
 		}
 
-		sigMatches := findPattern(data, gate.SigPrefix, gate.SigSuffix, gate.WildcardLen)
 		if len(sigMatches) == 0 {
 			consoleErr("gate signature not found (unsupported version?)")
 			return
@@ -523,4 +518,89 @@ func doRestoreAgy(path string) {
 	} else {
 		consoleErr("Restore error: " + err.Error())
 	}
+}
+
+func findPatternsInFile(path string, gate Gate) (patchedMatches []int, sigMatches []int, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	const chunkSize = 1024 * 1024 // 1 MB
+	overlapSize := len(gate.SigPrefix) + gate.WildcardLen + len(gate.SigSuffix)
+	if len(gate.PatchedPrefix) + gate.WildcardLen + len(gate.PatchedSuffix) > overlapSize {
+		overlapSize = len(gate.PatchedPrefix) + gate.WildcardLen + len(gate.PatchedSuffix)
+	}
+	overlapSize += 32 // safety margin
+
+	buf := make([]byte, chunkSize+overlapSize)
+	var offset int64 = 0
+	var bytesInBuf int = 0
+
+	for {
+		n, readErr := f.Read(buf[bytesInBuf:])
+		if n > 0 {
+			bytesInBuf += n
+		}
+
+		if bytesInBuf >= overlapSize {
+			searchLimit := bytesInBuf - overlapSize + 1
+			for i := 0; i < searchLimit; i++ {
+				if matchPatternAt(buf[i:], gate.PatchedPrefix, gate.PatchedSuffix, gate.WildcardLen) {
+					patchedMatches = append(patchedMatches, int(offset)+i)
+				}
+				if matchPatternAt(buf[i:], gate.SigPrefix, gate.SigSuffix, gate.WildcardLen) {
+					sigMatches = append(sigMatches, int(offset)+i)
+				}
+			}
+
+			keep := overlapSize
+			copy(buf[0:keep], buf[bytesInBuf-keep:bytesInBuf])
+			offset += int64(bytesInBuf - keep)
+			bytesInBuf = keep
+		}
+
+		if readErr == io.EOF {
+			pat1Len := len(gate.PatchedPrefix) + gate.WildcardLen + len(gate.PatchedSuffix)
+			searchLimit1 := bytesInBuf - pat1Len
+			for i := 0; i <= searchLimit1; i++ {
+				if matchPatternAt(buf[i:], gate.PatchedPrefix, gate.PatchedSuffix, gate.WildcardLen) {
+					patchedMatches = append(patchedMatches, int(offset)+i)
+				}
+			}
+
+			pat2Len := len(gate.SigPrefix) + gate.WildcardLen + len(gate.SigSuffix)
+			searchLimit2 := bytesInBuf - pat2Len
+			for i := 0; i <= searchLimit2; i++ {
+				if matchPatternAt(buf[i:], gate.SigPrefix, gate.SigSuffix, gate.WildcardLen) {
+					sigMatches = append(sigMatches, int(offset)+i)
+				}
+			}
+			break
+		} else if readErr != nil {
+			return nil, nil, readErr
+		}
+	}
+
+	return patchedMatches, sigMatches, nil
+}
+
+func matchPatternAt(data []byte, prefix, suffix []byte, wildcardLen int) bool {
+	patternLen := len(prefix) + wildcardLen + len(suffix)
+	if len(data) < patternLen {
+		return false
+	}
+	for j := 0; j < len(prefix); j++ {
+		if data[j] != prefix[j] {
+			return false
+		}
+	}
+	suffixStart := len(prefix) + wildcardLen
+	for j := 0; j < len(suffix); j++ {
+		if data[suffixStart+j] != suffix[j] {
+			return false
+		}
+	}
+	return true
 }

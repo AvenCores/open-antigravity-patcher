@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -547,11 +548,11 @@ func applyPatchesMinimal(content string, agVersion string) (string, []patchResul
 	return content, results
 }
 
-func isAlreadyPatched(content string) bool {
+func isAlreadyPatched(content []byte) bool {
 	reSimple := regexp.MustCompile(`if\(this\.[a-zA-Z_$]+\.isGoogleInternal\)`)
-	hasUnpatchedSimple := reSimple.MatchString(content)
-	hasUnpatchedAuth := ReAuthIsGoogleInternal.MatchString(content)
-	hasIde := strings.Contains(content, `ideName:"antigravity-insiders"`)
+	hasUnpatchedSimple := reSimple.Match(content)
+	hasUnpatchedAuth := ReAuthIsGoogleInternal.Match(content)
+	hasIde := bytes.Contains(content, []byte(`ideName:"antigravity-insiders"`))
 	return !hasUnpatchedSimple && !hasUnpatchedAuth && hasIde
 }
 
@@ -763,7 +764,7 @@ func doPatch(mainJsPath string) {
 	}
 	content := string(data)
 
-	currentIsPatched := isAlreadyPatched(content)
+	currentIsPatched := isAlreadyPatched(data)
 	runtimeSettingsChecked := false
 
 	if currentIsPatched {
@@ -1018,7 +1019,7 @@ func doRestore(mainJsPath string, showSearchLine bool) {
 		}
 	}
 
-	if isAlreadyPatched(string(data)) {
+	if isAlreadyPatched(data) {
 		warn("Backup itself appears to be patched!")
 		if !confirmed("Restore this patched backup?") {
 			hint("Restore cancelled.")

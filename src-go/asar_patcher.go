@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -586,7 +587,7 @@ func isAntigravityPatched(asarPath string) bool {
 	for {
 		n, err := f.Read(buf)
 		if n > 0 {
-			if strings.Contains(string(buf[:n]), "patchFrontendMainJs") {
+			if bytes.Contains(buf[:n], []byte("patchFrontendMainJs")) {
 				return true
 			}
 		}

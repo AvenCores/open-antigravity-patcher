@@ -10,7 +10,7 @@ func main() {
 	setupConsole()
 
 	if runtime.GOOS == "windows" {
-		if !isAdmin() {
+		if os.Getenv("SKIP_ELEVATION") != "1" && !isAdmin() {
 			if runAsAdmin() {
 				os.Exit(0)
 			} else {
