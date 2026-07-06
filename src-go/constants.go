@@ -3,7 +3,7 @@ package main
 import "regexp"
 
 const (
-	Version                      = "1.1.8"
+	Version                      = "1.1.9"
 	MinAgVersion                 = "2.1.0"
 	AuthPatchSwitchVersion       = "1.23"
 	RuntimeSettingsSwitchVersion = "1.23"
