@@ -25,6 +25,9 @@ GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/Open_AG_Patcher_Wind
 echo "Building for Windows (x86)..."
 GOOS=windows GOARCH=386 go build -ldflags="-s -w" -o dist/Open_AG_Patcher_Windows_x86.exe
 
+echo "Building for Windows (ARM64)..."
+GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/Open_AG_Patcher_Windows_arm64.exe
+
 echo "Building for Linux (x64)..."
 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/open_ag_patcher_linux_x64
 

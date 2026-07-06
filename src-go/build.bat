@@ -29,6 +29,11 @@ set GOOS=windows
 set GOARCH=386
 go build -ldflags="-s -w" -o dist/Open_AG_Patcher_Windows_x86.exe
 
+echo Building for Windows (ARM64)...
+set GOOS=windows
+set GOARCH=arm64
+go build -ldflags="-s -w" -o dist/Open_AG_Patcher_Windows_arm64.exe
+
 echo Building for Linux (x64)...
 set GOOS=linux
 set GOARCH=amd64
