@@ -58,7 +58,7 @@ jobs:
         working-directory: source
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-windows-${{ matrix.arch }}
           path: source/dist/${{ matrix.output }}
@@ -98,7 +98,7 @@ jobs:
         working-directory: source
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-linux-x64
           path: source/dist/Open_AG_Patcher_Linux
@@ -130,7 +130,7 @@ jobs:
           outputs: type=local,dest=source/dist-arm64
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-linux-arm64
           path: source/dist-arm64/Open_AG_Patcher_Linux_arm64
@@ -141,7 +141,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   build-macos:
     name: Build macOS (universal2)
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
@@ -170,7 +170,7 @@ jobs:
         working-directory: source
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-macos-universal2
           path: source/dist/Open_AG_Patcher_macOS
