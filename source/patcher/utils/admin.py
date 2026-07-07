@@ -44,14 +44,14 @@ def terminate_processes(names):
                 exec_name = name if name.lower().endswith(".exe") else f"{name}.exe"
                 res = subprocess.run(
                     ["taskkill", "/F", "/IM", exec_name],
-                    capture_output=True, text=True
+                    capture_output=True, text=True, timeout=10
                 )
                 if res.returncode == 0:
                     success = True
             else:
                 res = subprocess.run(
                     ["pkill", "-f", name],
-                    capture_output=True, text=True
+                    capture_output=True, text=True, timeout=10
                 )
                 if res.returncode == 0:
                     success = True

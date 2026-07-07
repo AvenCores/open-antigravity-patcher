@@ -13,9 +13,11 @@ except ImportError:
 def file_hash(path):
     """Возвращает SHA-256 файла или None при ошибке."""
     try:
+        h = hashlib.sha256()
         with open(path, "rb") as f:
-            data = f.read()
-        return hashlib.sha256(data).hexdigest()
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
     except Exception:
         return None
 
@@ -45,7 +47,7 @@ def fix_posix_permissions(path):
 
     if sudo_uid and sudo_gid:
         try:
-            subprocess.run(["chown", "-R", f"{sudo_uid}:{sudo_gid}", path], check=False)
+            subprocess.run(["chown", "-R", f"{sudo_uid}:{sudo_gid}", path], check=False, timeout=30)
         except Exception:
             pass
 
@@ -132,7 +134,7 @@ def resign_macos_bundle(main_js_path):
     try:
         subprocess.run(
             ["codesign", "--force", "--deep", "--sign", "-", app_path],
-            check=True, capture_output=True, text=True,
+            check=True, capture_output=True, text=True, timeout=60,
         )
         ok("Ad-hoc signature applied")
     except FileNotFoundError:
@@ -146,7 +148,7 @@ def resign_macos_bundle(main_js_path):
     try:
         subprocess.run(
             ["xattr", "-dr", "com.apple.quarantine", app_path],
-            check=False, capture_output=True,
+            check=False, capture_output=True, timeout=30,
         )
     except FileNotFoundError:
         pass
@@ -170,7 +172,7 @@ def resign_macos_binary(path):
     try:
         subprocess.run(
             ["codesign", "--force", "--sign", "-", real],
-            check=True, capture_output=True, text=True,
+            check=True, capture_output=True, text=True, timeout=60,
         )
         ok("Ad-hoc signature applied")
     except FileNotFoundError:

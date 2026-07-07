@@ -56,6 +56,20 @@ def find_unpacked_file(asar_path, current_path):
     return None
 
 
+def _read_asar_header(f):
+    """Read ASAR header from an open binary file positioned at the start.
+    Returns (header_dict, payload_offset) or (None, None) on error.
+    """
+    try:
+        _, header_size, _, json_size = struct.unpack('<IIII', f.read(16))
+        json_bytes = f.read(json_size)
+        header = json.loads(json_bytes.decode('utf-8'))
+        payload_offset = 8 + header_size
+        return header, payload_offset
+    except Exception:
+        return None, None
+
+
 def extract_asar(asar_path, dest_dir):
     asar_path = os.path.abspath(asar_path)
     if not os.path.exists(asar_path):
@@ -63,23 +77,23 @@ def extract_asar(asar_path, dest_dir):
         return False
 
     info(f"Extracting '{os.path.basename(asar_path)}' to temp directory...")
-    
+
     with open(asar_path, 'rb') as f:
-        try:
-            _, header_size, _, json_size = struct.unpack('<IIII', f.read(16))
-        except struct.error:
-            err("Invalid ASAR file format (unable to read header structure).")
+        header, payload_offset = _read_asar_header(f)
+        if header is None:
+            err("Invalid ASAR file format (unable to read header structure or JSON).")
             return False
-        
-        try:
-            json_bytes = f.read(json_size)
-            header = json.loads(json_bytes.decode('utf-8'))
-        except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            err(f"Failed to parse ASAR header JSON: {e}")
-            return False
-            
-        payload_offset = 8 + header_size
-        
+
+        def _copy_chunked(src_f, dst_path, size, chunk_size=1024*1024):
+            remaining = size
+            with open(dst_path, 'wb') as out_f:
+                while remaining > 0:
+                    chunk = src_f.read(min(chunk_size, remaining))
+                    if not chunk:
+                        break
+                    out_f.write(chunk)
+                    remaining -= len(chunk)
+
         def extract_entry(entry, current_path):
             if 'files' in entry:
                 dir_path = os.path.join(dest_dir, current_path)
@@ -89,7 +103,7 @@ def extract_asar(asar_path, dest_dir):
             else:
                 file_path = os.path.join(dest_dir, current_path)
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                
+
                 if entry.get('unpacked'):
                     src_file = find_unpacked_file(asar_path, current_path)
                     if src_file:
@@ -100,9 +114,7 @@ def extract_asar(asar_path, dest_dir):
                     offset = int(entry['offset'])
                     size = entry['size']
                     f.seek(payload_offset + offset)
-                    data = f.read(size)
-                    with open(file_path, 'wb') as out_f:
-                        out_f.write(data)
+                    _copy_chunked(f, file_path, size)
 
         extract_entry(header, '')
         fix_posix_permissions(dest_dir)
@@ -114,13 +126,13 @@ def get_unpacked_paths(asar_path):
     unpacked_paths = set()
     if not os.path.exists(asar_path):
         return unpacked_paths
-        
+
     try:
         with open(asar_path, 'rb') as f:
-            _, _, _, json_size = struct.unpack('<IIII', f.read(16))
-            json_bytes = f.read(json_size)
-            header = json.loads(json_bytes.decode('utf-8'))
-            
+            header, _ = _read_asar_header(f)
+            if header is None:
+                return unpacked_paths
+
             def collect_unpacked(entry, current_path):
                 if 'files' in entry:
                     for name, child in entry['files'].items():
@@ -128,11 +140,11 @@ def get_unpacked_paths(asar_path):
                 else:
                     if entry.get('unpacked'):
                         unpacked_paths.add(current_path.replace('\\', '/'))
-            
+
             collect_unpacked(header, '')
     except Exception as e:
         warn(f"Could not read original ASAR header to check unpacked files: {e}")
-        
+
     return unpacked_paths
 
 

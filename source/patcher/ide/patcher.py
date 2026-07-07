@@ -43,11 +43,13 @@ from patcher.ide.discovery import (
 )
 
 
+RE_IF_INTERNAL = re.compile(r"if\(this\.([a-zA-Z_$]+)\.isGoogleInternal\)")
+
+
 def _patch_is_google_internal(content):
     """if(isGoogleInternal) → if(true) — forces internal Google path bypassing geo/eligibility checks."""
-    re_if_internal = re.compile(r"if\(this\.([a-zA-Z_$]+)\.isGoogleInternal\)")
-    matches = [m.group(0) for m in re_if_internal.finditer(content)]
-    new_content = re_if_internal.sub("if(true)", content)
+    matches = [m.group(0) for m in RE_IF_INTERNAL.finditer(content)]
+    new_content = RE_IF_INTERNAL.sub("if(true)", content)
     applied = new_content != content
     detail = f"replaced {len(matches)} occurrences: {list(set(matches))}" if applied else ""
     return new_content, {

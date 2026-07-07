@@ -2,9 +2,12 @@ import os
 import sys
 import json
 import subprocess
+import string
 from enum import Enum
 from packaging.version import Version
 from patcher.constants import AG_REGISTRY_SUBKEY, MIN_AG_VERSION
+from patcher.utils.file import get_posix_invoking_user_home
+from patcher.utils.console import ok
 
 
 class VersionStatus(Enum):
@@ -20,11 +23,9 @@ def clean_path(raw_path):
 
 def find_portable_candidates(search_type="ide"):
     """Ищет портативные версии в пользовательских папках и на других дисках."""
-    import string
     roots = []
 
     # 1. Получаем домашнюю папку пользователя
-    from patcher.utils.file import get_posix_invoking_user_home
     home = ""
     if sys.platform != "win32":
         home = get_posix_invoking_user_home()
@@ -45,14 +46,13 @@ def find_portable_candidates(search_type="ide"):
 
     # 2. На Linux просим систему дать точные пути через xdg-user-dir
     if sys.platform != "win32" and os.name == "posix":
-        import subprocess
         sudo_user = os.environ.get("SUDO_USER")
         for folder_type in ["DOWNLOAD", "DESKTOP", "DOCUMENTS"]:
             try:
                 cmd = ["xdg-user-dir", folder_type]
                 if sudo_user:
                     cmd = ["sudo", "-u", sudo_user, "xdg-user-dir", folder_type]
-                res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                res = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
                 if res.returncode == 0:
                     path = res.stdout.strip()
                     if path and os.path.isdir(path):
@@ -92,23 +92,25 @@ def find_portable_candidates(search_type="ide"):
     visited_dirs = 0
     max_dirs = 1500
 
+    # Исключаем тяжелые/системные папки (предвычисляем множество имён в нижнем регистре)
+    prune_dirs = {
+        ".git", "node_modules", "AppData", "Application Data", "Library",
+        "System Volume Information", "$RECYCLE.BIN", "Windows", "Program Files",
+        "Program Files (x86)", "usr", "var", "sys", "proc", "dev", "dist", "build",
+        "__pycache__", ".idea", ".vscode"
+    }
+    prune_lower = {p.lower() for p in prune_dirs}
+
     for root in roots:
         if not os.path.isdir(root):
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             visited_dirs += 1
             if visited_dirs > max_dirs:
-                break
+                return candidates
 
-            # Исключаем тяжелые/системные папки
-            prune_dirs = {
-                ".git", "node_modules", "AppData", "Application Data", "Library",
-                "System Volume Information", "$RECYCLE.BIN", "Windows", "Program Files",
-                "Program Files (x86)", "usr", "var", "sys", "proc", "dev", "dist", "build",
-                "__pycache__", ".idea", ".vscode"
-            }
             # Фильтруем dirnames на месте
-            dirnames[:] = [d for d in dirnames if d.lower() not in [p.lower() for p in prune_dirs] and not d.startswith('.')]
+            dirnames[:] = [d for d in dirnames if d.lower() not in prune_lower and not d.startswith('.')]
 
             # Вычисляем глубину относительно корня поиска
             try:
@@ -140,7 +142,6 @@ def find_portable_candidates(search_type="ide"):
                                 candidates.append(dirpath)
                                 label = "Antigravity IDE"
                                 try:
-                                    from patcher.utils.console import ok
                                     ok(f"Found portable {label} at: {dirpath}")
                                 except Exception:
                                     print(f"  [+] Found portable {label} at: {dirpath}")
@@ -153,13 +154,9 @@ def find_portable_candidates(search_type="ide"):
                             candidates.append(dirpath)
                             label = "Antigravity"
                             try:
-                                from patcher.utils.console import ok
                                 ok(f"Found portable {label} at: {dirpath}")
                             except Exception:
                                 print(f"  [+] Found portable {label} at: {dirpath}")
-
-        if visited_dirs > max_dirs:
-            break
 
     return candidates
 
@@ -210,7 +207,6 @@ def find_install_root():
         except ImportError:
             pass
 
-    found_standard = ""
     for path in candidates:
         for sub in [
             os.path.join("resources", "app", "out", "main.js"),
@@ -219,21 +215,12 @@ def find_install_root():
             "main.js",
         ]:
             if os.path.exists(os.path.join(path, sub)):
-                found_standard = path
-                break
-        if found_standard:
-            break
+                return path
 
-    # Always execute portable search to print matches for visibility
+    # Fallback to portable search only if standard paths did not match
     portable = find_portable_candidates("ide")
-
-    if found_standard:
-        return found_standard
-
     if portable:
         return portable[0]
-
-    return ""
 
     return ""
 
@@ -268,7 +255,7 @@ def get_ag_version(main_js_path):
             try:
                 result = subprocess.run(
                     ["dpkg-query", "-W", "-f=${Version}", pkg],
-                    capture_output=True, text=True,
+                    capture_output=True, text=True, timeout=10,
                 )
                 if result.returncode == 0:
                     ver = result.stdout.strip()
@@ -282,7 +269,7 @@ def get_ag_version(main_js_path):
             try:
                 result = subprocess.run(
                     ["rpm", "-q", "--queryformat", "%{VERSION}", pkg],
-                    capture_output=True, text=True,
+                    capture_output=True, text=True, timeout=10,
                 )
                 if result.returncode == 0:
                     ver = result.stdout.strip()

@@ -2,6 +2,9 @@ import os
 import sys
 import json
 import struct
+import mmap
+
+from patcher.asar.archive import _read_asar_header
 
 
 def find_antigravity_root():
@@ -156,13 +159,14 @@ def is_antigravity_patched(asar_path):
         return False
     try:
         with open(asar_path, 'rb') as f:
-            while True:
-                chunk = f.read(1024 * 1024)
-                if not chunk:
-                    break
-                if b"patchFrontendMainJs" in chunk:
-                    return True
-        return False
+            size = os.fstat(f.fileno()).st_size
+            if size == 0:
+                return False
+            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+            try:
+                return mm.find(b"patchFrontendMainJs") != -1
+            finally:
+                mm.close()
     except Exception:
         return False
 
@@ -172,16 +176,15 @@ def read_package_json_from_asar(asar_path):
         return None
     try:
         with open(asar_path, 'rb') as f:
-            _, header_size, _, json_size = struct.unpack('<IIII', f.read(16))
-            json_bytes = f.read(json_size)
-            header = json.loads(json_bytes.decode('utf-8'))
-            
+            header, payload_offset = _read_asar_header(f)
+            if header is None:
+                return None
+
             files = header.get('files', {})
             pkg_entry = files.get('package.json')
             if pkg_entry and 'offset' in pkg_entry and 'size' in pkg_entry:
                 offset = int(pkg_entry['offset'])
                 size = pkg_entry['size']
-                payload_offset = 8 + header_size
                 f.seek(payload_offset + offset)
                 data = f.read(size)
                 pkg_data = json.loads(data.decode('utf-8'))
