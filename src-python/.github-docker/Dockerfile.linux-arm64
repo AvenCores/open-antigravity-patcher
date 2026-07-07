@@ -1,7 +1,7 @@
 # Dockerfile for building Open AG Patcher (Python) for Linux ARM64 via QEMU
 # Used exclusively in GitHub Actions build-python.yml
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
