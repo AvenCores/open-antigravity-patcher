@@ -1,0 +1,179 @@
+name: Build Python
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Windows: x64, x86, ARM64
+  # PyInstaller runs natively on Windows; ARM64 build is cross-compiled via x64
+  # runner because GitHub doesn't offer Windows ARM64 runners yet.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            python-arch: x64
+            output: Open_AG_Patcher_Windows.exe
+          - arch: x86
+            python-arch: x86
+            output: Open_AG_Patcher_Windows_x86.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python (${{ matrix.arch }})
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.python-arch }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: src-python
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller --onefile
+          --uac-admin
+          --icon=icon.ico
+          --name="${{ matrix.output == 'Open_AG_Patcher_Windows.exe' && 'Open_AG_Patcher_Windows' || 'Open_AG_Patcher_Windows_x86' }}"
+          --noupx
+          --clean
+          --version-file=version.txt
+          main.py
+        working-directory: src-python
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-windows-${{ matrix.arch }}
+          path: src-python/dist/${{ matrix.output }}
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Linux x64
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-linux-x64:
+    name: Build Linux (x64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: src-python
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller --onefile
+          --icon=icon.ico
+          --name="Open_AG_Patcher_Linux"
+          --hidden-import=packaging
+          --hidden-import=packaging.version
+          --hidden-import=packaging.specifiers
+          --hidden-import=packaging.requirements
+          --clean
+          main.py
+        working-directory: src-python
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-linux-x64
+          path: src-python/dist/Open_AG_Patcher_Linux
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Linux ARM64 — via QEMU emulation
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-linux-arm64:
+    name: Build Linux (ARM64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build inside ARM64 container
+        uses: docker/build-push-action@v5
+        with:
+          context: src-python
+          file: src-python/.github-docker/Dockerfile.linux-arm64
+          platforms: linux/arm64
+          push: false
+          outputs: type=local,dest=src-python/dist-arm64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-linux-arm64
+          path: src-python/dist-arm64/Open_AG_Patcher_Linux_arm64
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # macOS — universal2 binary (Intel + Apple Silicon in one file)
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-macos:
+    name: Build macOS (universal2)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python (universal2 / arm64 host)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: src-python
+
+      - name: Build with PyInstaller (universal2)
+        run: >
+          pyinstaller --onefile
+          --name="Open_AG_Patcher_macOS"
+          --target-arch universal2
+          --hidden-import=packaging
+          --hidden-import=packaging.version
+          --hidden-import=packaging.specifiers
+          --hidden-import=packaging.requirements
+          --clean
+          main.py
+        working-directory: src-python
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-macos-universal2
+          path: src-python/dist/Open_AG_Patcher_macOS
+          if-no-files-found: error
+
+
