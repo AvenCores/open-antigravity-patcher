@@ -323,6 +323,7 @@ def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_c
 
 def do_patch(main_js_path, show_search_line=False):
     from patcher.cli import confirmed
+    from patcher.utils.captcha import confirm_with_captcha
 
     if not os.path.isfile(main_js_path):
         err(f"Target is not a file: {main_js_path}")
@@ -356,14 +357,10 @@ def do_patch(main_js_path, show_search_line=False):
         return
 
     current_is_patched = is_already_patched(content)
-    runtime_settings_checked = False
 
     if current_is_patched:
         hint("File appears already patched.")
-        info("Applying runtime settings workaround...")
-        print_runtime_settings_result(patch_runtime_settings(parsed_version))
-        runtime_settings_checked = True
-        if not confirmed("Apply main.js patches anyway?"):
+        if not confirm_with_captcha("Apply main.js patches anyway?"):
             return
 
     # --- БЭКАП — копируем файл ДО любых изменений ---
@@ -429,9 +426,8 @@ def do_patch(main_js_path, show_search_line=False):
 
     hash_after = file_hash(main_js_path)
     resign_macos_bundle(main_js_path)
-    if not runtime_settings_checked:
-        info("Applying runtime settings workaround...")
-        print_runtime_settings_result(patch_runtime_settings(parsed_version))
+    info("Applying runtime settings workaround...")
+    print_runtime_settings_result(patch_runtime_settings(parsed_version))
 
     panel_rows = [
         ("Target", os.path.basename(main_js_path)),

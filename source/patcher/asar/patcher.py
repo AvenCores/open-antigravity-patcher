@@ -97,6 +97,7 @@ def patch_antigravity_main_js(dest_folder, rollback=False):
 
 def do_patch_antigravity(antigravity_root):
     from patcher.cli import confirmed
+    from patcher.utils.captcha import confirm_with_captcha
 
     if not antigravity_root or not os.path.isdir(antigravity_root):
         err(f"Antigravity root path not found: {antigravity_root}")
@@ -109,7 +110,7 @@ def do_patch_antigravity(antigravity_root):
 
     if is_antigravity_patched(asar_path):
         hint("Antigravity appears already patched.")
-        if not confirmed("Apply patch anyway?"):
+        if not confirm_with_captcha("Apply patch anyway?"):
             return
 
     source_asar_path = asar_path + ".bak"

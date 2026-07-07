@@ -190,6 +190,7 @@ def _copy_to_user_bin(path):
 
 def do_patch_agy(path):
     from patcher.cli import confirmed
+    from patcher.utils.captcha import confirm_with_captcha
 
     if not os.path.isfile(path):
         err(f"Target is not a file: {path}")
@@ -225,10 +226,9 @@ def do_patch_agy(path):
                     err(f"{e}")
                     return
                 if kind == "patched":
-                    hint("agy already patched — nothing to do.")
-                    if os.name == "posix":
-                        _copy_to_user_bin(path)
-                    return
+                    hint("agy already patched.")
+                    if not confirm_with_captcha("Apply patch anyway?"):
+                        return
         except OSError as e:
             err(f"Read error: {e}")
             return
