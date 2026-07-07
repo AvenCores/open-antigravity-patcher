@@ -12,9 +12,8 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # Windows: x64, x86, ARM64
-  # PyInstaller runs natively on Windows; ARM64 build is cross-compiled via x64
-  # runner because GitHub doesn't offer Windows ARM64 runners yet.
+  # Windows: x64, x86
+  # PyInstaller runs natively; architecture param selects the Python interpreter bitness.
   # ─────────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Build Windows (${{ matrix.arch }})
@@ -62,6 +61,47 @@ jobs:
         with:
           name: python-windows-${{ matrix.arch }}
           path: source/dist/${{ matrix.output }}
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Windows ARM64 — native windows-11-arm runner
+  # setup-python@v6 on ARM64 runners does not accept the 'architecture' param,
+  # so this target runs as a dedicated job.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-windows-arm64:
+    name: Build Windows (arm64)
+    runs-on: windows-11-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: source
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller --onefile
+          --uac-admin
+          --icon=icon.ico
+          --name="Open_AG_Patcher_Windows_arm64"
+          --noupx
+          --clean
+          --version-file=version.txt
+          main.py
+        working-directory: source
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-windows-arm64
+          path: source/dist/Open_AG_Patcher_Windows_arm64.exe
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────────
