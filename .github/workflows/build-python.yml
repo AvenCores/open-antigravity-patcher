@@ -26,9 +26,6 @@ jobs:
           - arch: x64
             python-arch: x64
             output: Open_AG_Patcher_Windows.exe
-          - arch: x86
-            python-arch: x86
-            output: Open_AG_Patcher_Windows_x86.exe
 
     steps:
       - name: Checkout repository
