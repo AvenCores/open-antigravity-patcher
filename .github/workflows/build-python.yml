@@ -25,7 +25,7 @@ jobs:
         include:
           - arch: x64
             python-arch: x64
-            output: Open_AG_Patcher_Windows.exe
+            output: Open_AG_Patcher_Windows_x64.exe
 
     steps:
       - name: Checkout repository
@@ -46,7 +46,7 @@ jobs:
           pyinstaller --onefile
           --uac-admin
           --icon=icon.ico
-          --name="${{ matrix.output == 'Open_AG_Patcher_Windows.exe' && 'Open_AG_Patcher_Windows' || 'Open_AG_Patcher_Windows_x86' }}"
+          --name="Open_AG_Patcher_Windows_x64"
           --noupx
           --clean
           --version-file=version.txt
@@ -125,7 +125,7 @@ jobs:
         run: >
           pyinstaller --onefile
           --icon=icon.ico
-          --name="Open_AG_Patcher_Linux"
+          --name="Open_AG_Patcher_Linux_amd64"
           --hidden-import=packaging
           --hidden-import=packaging.version
           --hidden-import=packaging.specifiers
@@ -138,7 +138,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: python-linux-x64
-          path: source/dist/Open_AG_Patcher_Linux
+          path: source/dist/Open_AG_Patcher_Linux_amd64
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────────
