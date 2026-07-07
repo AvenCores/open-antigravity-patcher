@@ -1,19 +1,15 @@
 # Environments
 .env/
 .venv/
-src-python/.env/
-src-python/.venv/
+source/.env/
+source/.venv/
 
 # Python builds and caches
-src-python/build/
-src-python/dist/
-src-python/__pycache__/
-src-python/patcher/**/__pycache__/
-src-python/*.spec
-
-# Go builds and resources
-src-go/dist/
-src-go/rsrc_windows_*.syso
+source/build/
+source/dist/
+source/__pycache__/
+source/patcher/**/__pycache__/
+source/*.spec
 
 # Temporary local app files
 main.js

@@ -43,7 +43,7 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-        working-directory: src-python
+        working-directory: source
 
       - name: Build with PyInstaller
         run: >
@@ -55,13 +55,13 @@ jobs:
           --clean
           --version-file=version.txt
           main.py
-        working-directory: src-python
+        working-directory: source
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-windows-${{ matrix.arch }}
-          path: src-python/dist/${{ matrix.output }}
+          path: source/dist/${{ matrix.output }}
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-        working-directory: src-python
+        working-directory: source
 
       - name: Build with PyInstaller
         run: >
@@ -95,13 +95,13 @@ jobs:
           --hidden-import=packaging.requirements
           --clean
           main.py
-        working-directory: src-python
+        working-directory: source
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-linux-x64
-          path: src-python/dist/Open_AG_Patcher_Linux
+          path: source/dist/Open_AG_Patcher_Linux
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────────
@@ -123,17 +123,17 @@ jobs:
       - name: Build inside ARM64 container
         uses: docker/build-push-action@v5
         with:
-          context: src-python
-          file: src-python/.github-docker/Dockerfile.linux-arm64
+          context: source
+          file: source/.github-docker/Dockerfile.linux-arm64
           platforms: linux/arm64
           push: false
-          outputs: type=local,dest=src-python/dist-arm64
+          outputs: type=local,dest=source/dist-arm64
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-linux-arm64
-          path: src-python/dist-arm64/Open_AG_Patcher_Linux_arm64
+          path: source/dist-arm64/Open_AG_Patcher_Linux_arm64
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-        working-directory: src-python
+        working-directory: source
 
       - name: Build with PyInstaller (universal2)
         run: >
@@ -167,13 +167,13 @@ jobs:
           --hidden-import=packaging.requirements
           --clean
           main.py
-        working-directory: src-python
+        working-directory: source
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-macos-universal2
-          path: src-python/dist/Open_AG_Patcher_macOS
+          path: source/dist/Open_AG_Patcher_macOS
           if-no-files-found: error
 
 
