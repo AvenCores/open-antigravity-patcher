@@ -161,7 +161,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: source
-          file: source/.github-docker/Dockerfile.linux-arm64
+          file: .github/.github-docker/Dockerfile.linux-arm64
           platforms: linux/arm64
           push: false
           outputs: type=local,dest=source/dist-arm64
