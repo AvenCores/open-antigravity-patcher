@@ -1,6 +1,6 @@
 import random
 
-from patcher.utils.console import warn, color, COLOR_CYAN
+from patcher.utils.console import warn, hint, color, COLOR_CYAN
 
 
 def generate_math_captcha():
