@@ -14,14 +14,16 @@
 </div>
 
 # 🔑 Open AG Patcher
-[![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://github.com/AvenCores/open-antigravity-patcher)
-[![GPL-3.0 License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](./LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/AvenCores/Unlock_AI_and_EN_Services_for_Russia?style=for-the-badge)](https://github.com/AvenCores/Unlock_AI_and_EN_Services_for_Russia/releases/latest)
-[![GitHub stars](https://img.shields.io/github/stars/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/stargazers)
-![GitHub forks](https://img.shields.io/github/forks/AvenCores/open-antigravity-patcher?style=for-the-badge)
-[![Downloads](https://img.shields.io/github/downloads/AvenCores/Unlock_AI_and_EN_Services_for_Russia/total?style=for-the-badge)](https://github.com/AvenCores/Unlock_AI_and_EN_Services_for_Russia/releases)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/pulls)
-[![GitHub issues](https://img.shields.io/github/issues/AvenCores/open-antigravity-patcher?style=for-the-badge)](https://github.com/AvenCores/open-antigravity-patcher/issues)
+<p align="center">
+  <a href="https://github.com/AvenCores/open-antigravity-patcher"><img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="Python"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="GPL-3.0 License"></a>
+  <a href="https://github.com/AvenCores/Unlock_AI_and_EN_Services_for_Russia/releases/latest"><img src="https://img.shields.io/github/v/release/AvenCores/Unlock_AI_and_EN_Services_for_Russia?style=for-the-badge" alt="Latest release"></a>
+  <a href="https://github.com/AvenCores/open-antigravity-patcher/stargazers"><img src="https://img.shields.io/github/stars/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub stars"></a>
+  <img src="https://img.shields.io/github/forks/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub forks">
+  <a href="https://github.com/AvenCores/Unlock_AI_and_EN_Services_for_Russia/releases"><img src="https://img.shields.io/github/downloads/AvenCores/Unlock_AI_and_EN_Services_for_Russia/total?style=for-the-badge" alt="Downloads"></a>
+  <a href="https://github.com/AvenCores/open-antigravity-patcher/pulls"><img src="https://img.shields.io/github/issues-pr/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub pull requests"></a>
+  <a href="https://github.com/AvenCores/open-antigravity-patcher/issues"><img src="https://img.shields.io/github/issues/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub issues"></a>
+</p>
 
 Опенсорс патчер для Antigravity IDE и standalone-приложения Antigravity: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
 
