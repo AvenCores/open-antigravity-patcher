@@ -34,6 +34,7 @@ def confirm_with_captcha(message):
     warn("Warning: this file appears to be already patched.")
     warn("Re-patching is most likely unnecessary and may cause issues.")
     warn("If you are sure, solve the CAPTCHA below to proceed.")
+    hint("Leave the answer empty and press Enter to return to the main menu.")
 
     while True:
         question, expected = generate_math_captcha()
