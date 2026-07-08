@@ -20,6 +20,8 @@
   <a href="https://github.com/AvenCores/open-antigravity-patcher/releases/latest"><img src="https://img.shields.io/github/v/release/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="Latest release"></a>
   <a href="https://github.com/AvenCores/open-antigravity-patcher/stargazers"><img src="https://img.shields.io/github/stars/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub stars"></a>
   <img src="https://img.shields.io/github/forks/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub forks">
+  <a href="https://github.com/AvenCores/open-antigravity-patcher/watchers">
+  <img src="https://img.shields.io/github/watchers/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub Watchers"></a>
   <a href="https://github.com/AvenCores/open-antigravity-patcher/releases"><img src="https://img.shields.io/github/downloads/AvenCores/open-antigravity-patcher/total?style=for-the-badge" alt="Downloads"></a>
   <a href="https://github.com/AvenCores/open-antigravity-patcher/pulls"><img src="https://img.shields.io/github/issues-pr/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub pull requests"></a>
   <a href="https://github.com/AvenCores/open-antigravity-patcher/issues"><img src="https://img.shields.io/github/issues/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub issues"></a>
