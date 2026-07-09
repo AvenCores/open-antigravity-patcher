@@ -15,6 +15,7 @@ source/*.spec
 main.js
 app/
 app_original.asar
+dist/
 
 # AI agents
 .kimchi/
