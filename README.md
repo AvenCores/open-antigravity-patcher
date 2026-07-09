@@ -197,6 +197,12 @@ python3 main.py /usr/local/bin/agy
 
 Поскольку готовые бинарные сборки для macOS отсутствуют в официальных релизах (доступны только для Windows и Linux), вы можете либо запускать патчер напрямую из исходного кода, либо собрать исполняемый файл самостоятельно.
 
+#### Готовая universal2-сборка для macOS
+
+В fork `coneldiablo/open-antigravity-patcher` публикуется готовый `universal2`-бинарник для Intel и Apple Silicon: [последний macOS release](https://github.com/coneldiablo/open-antigravity-patcher/releases/latest).
+
+Инструкция для перехода со старого патча и устранения чёрного окна: [MACOS_RELEASE.md](./MACOS_RELEASE.md).
+
 #### Вариант 1: Запуск из исходного кода (рекомендуется)
 1. Создайте виртуальное окружение, активируйте его и установите необходимые зависимости:
    ```bash

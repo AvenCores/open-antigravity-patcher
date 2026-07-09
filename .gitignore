@@ -5,6 +5,9 @@ source/.env/
 source/.venv/
 
 # Python builds and caches
+build/
+dist/
+*.spec
 source/build/
 source/dist/
 source/__pycache__/
@@ -19,3 +22,4 @@ dist/
 
 # AI agents
 .kimchi/
+.DS_Store
