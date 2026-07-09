@@ -4,7 +4,10 @@ import json
 import struct
 import mmap
 
+from packaging.version import Version
 from patcher.asar.archive import _read_asar_header
+from patcher.constants import MIN_ANTIGRAVITY_VERSION
+from patcher.ide.discovery import VersionStatus
 
 
 def find_antigravity_root():
@@ -192,3 +195,21 @@ def read_package_json_from_asar(asar_path):
     except Exception:
         pass
     return None
+
+
+def check_antigravity_version(asar_path):
+    """
+    Проверяет версию Antigravity standalone из package.json внутри ASAR.
+    Возвращает (VersionStatus, detected_version_str | None).
+    """
+    ver_str = read_package_json_from_asar(asar_path)
+    if ver_str is None:
+        return VersionStatus.NOT_FOUND, None
+
+    try:
+        detected = Version(ver_str)
+        minimum = Version(MIN_ANTIGRAVITY_VERSION)
+        status = VersionStatus.OK if detected >= minimum else VersionStatus.TOO_OLD
+        return status, ver_str
+    except Exception:
+        return VersionStatus.PARSE_ERROR, ver_str

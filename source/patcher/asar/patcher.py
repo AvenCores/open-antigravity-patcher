@@ -30,7 +30,13 @@ from patcher.utils.file import (
     fix_posix_permissions,
     resign_macos_bundle,
 )
-from patcher.asar.discovery import resolve_antigravity_paths, is_antigravity_patched
+from patcher.asar.discovery import (
+    resolve_antigravity_paths,
+    is_antigravity_patched,
+    check_antigravity_version,
+)
+from patcher.ide.discovery import VersionStatus, parse_version_safe
+from patcher.constants import MIN_ANTIGRAVITY_VERSION
 from patcher.asar.archive import extract_asar, pack_asar
 
 
@@ -115,6 +121,24 @@ def do_patch_antigravity(antigravity_root):
     if not os.path.exists(asar_path):
         err(f"ASAR file not found: {asar_path}")
         return
+
+    ver_status, ver_str = check_antigravity_version(asar_path)
+    parsed_version = parse_version_safe(ver_str)
+
+    if ver_status == VersionStatus.TOO_OLD:
+        err(f"Unsupported version: {ver_str}")
+        err(f"Minimum required: {MIN_ANTIGRAVITY_VERSION}")
+        hint("Please update Antigravity and try again.")
+        if not confirmed("Proceed anyway?"):
+            return
+    elif ver_status == VersionStatus.NOT_FOUND:
+        warn("Could not detect Antigravity version (package.json not found in ASAR).")
+        if not confirmed("Proceed without version check?"):
+            return
+    elif ver_status == VersionStatus.PARSE_ERROR:
+        warn(f"Could not parse version string: {ver_str}")
+        if not confirmed("Proceed anyway?"):
+            return
 
     if is_antigravity_patched(asar_path):
         hint("Antigravity appears already patched.")
