@@ -88,14 +88,6 @@ def patch_antigravity_main_js(dest_folder, rollback=False):
             content = f.read()
         hint("Found old download-only patch; restored backup content before applying frontend patch proxy.")
 
-    # On some systems (especially Windows with IPv6 enabled) the language server
-    # binds to "localhost" which may resolve to ::1, while Electron loads
-    # https://127.0.0.1:<port>/ and times out. Use localhost so the client resolves
-    # to the same address family the server bound to.
-    if "https://127.0.0.1:" in content:
-        content = content.replace("https://127.0.0.1:", "https://localhost:")
-        info("Switched language server URLs from 127.0.0.1 to localhost.")
-
     if target_str not in content:
         err(f"Target line '{target_str}' not found in main.js")
         return False
