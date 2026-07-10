@@ -35,6 +35,8 @@ from patcher.utils.file import (
     backup_json_file,
     get_posix_invoking_user_home,
     resign_macos_bundle,
+    remove_macos_immutable_flags,
+    remove_macos_quarantine,
 )
 from patcher.ide.discovery import (
     check_ag_version,
@@ -368,11 +370,33 @@ def do_patch(main_js_path, show_search_line=False):
 
     if not os.path.exists(backup_path) and not current_is_patched:
         info("Creating backup...")
+        # На macOS снимаем immutable-флаги перед записью в .app-бандл
+        if sys.platform == "darwin":
+            app_dir = os.path.dirname(os.path.dirname(main_js_path))
+            remove_macos_immutable_flags(app_dir)
         try:
             shutil.copy2(main_js_path, backup_path)
             fix_posix_permissions(backup_path)
             ok(f"Backup: {os.path.basename(backup_path)} "
                f"({format_bytes(file_size(backup_path))})")
+        except PermissionError as e:
+            # На macOS повторяем попытку после снятия флагов
+            if sys.platform == "darwin":
+                warn(f"Permission denied, retrying after removing flags...")
+                app_dir = os.path.dirname(os.path.dirname(main_js_path))
+                remove_macos_immutable_flags(app_dir)
+                remove_macos_quarantine(app_dir)
+                try:
+                    shutil.copy2(main_js_path, backup_path)
+                    fix_posix_permissions(backup_path)
+                    ok(f"Backup: {os.path.basename(backup_path)} "
+                       f"({format_bytes(file_size(backup_path))})")
+                except Exception as e2:
+                    err(f"Backup error: {e2}")
+                    return
+            else:
+                err(f"Backup error: {e}")
+                return
         except Exception as e:
             err(f"Backup error: {e}")
             return
@@ -410,6 +434,14 @@ def do_patch(main_js_path, show_search_line=False):
             break
         except PermissionError as e:
             if attempt == 0:
+                # На macOS снимаем immutable-флаги перед повторной попыткой
+                if sys.platform == "darwin":
+                    warn(f"Permission denied, retrying after removing flags...")
+                    app_dir = os.path.dirname(os.path.dirname(main_js_path))
+                    remove_macos_immutable_flags(app_dir)
+                    remove_macos_quarantine(app_dir)
+                    time.sleep(0.5)
+                    continue
                 warn(f"Permission denied (file locked): {e}")
                 if confirmed("Would you like to automatically close running Antigravity processes and retry?"):
                     terminate_processes(["Antigravity", "Antigravity IDE", "antigravity", "antigravity-ide"])
@@ -598,18 +630,43 @@ def do_restore(main_js_path, show_search_line=False):
     # Атомарная запись через временный файл
     tmp_path = main_js_path + ".tmp"
     try:
+        # На macOS снимаем immutable-флаги перед записью в .app-бандл
+        if sys.platform == "darwin":
+            app_dir = os.path.dirname(os.path.dirname(main_js_path))
+            remove_macos_immutable_flags(app_dir)
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(data)
         os.replace(tmp_path, main_js_path)
         fix_posix_permissions(main_js_path)
     except Exception as e:
-        err(f"Restore error: {e}")
-        if os.path.exists(tmp_path):
+        # На macOS повторяем попытку после снятия флагов
+        if sys.platform == "darwin":
+            warn(f"Restore failed, retrying after removing flags...")
+            app_dir = os.path.dirname(os.path.dirname(main_js_path))
+            remove_macos_immutable_flags(app_dir)
+            remove_macos_quarantine(app_dir)
             try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
-        return
+                if not os.path.exists(tmp_path):
+                    with open(tmp_path, "w", encoding="utf-8") as f:
+                        f.write(data)
+                os.replace(tmp_path, main_js_path)
+                fix_posix_permissions(main_js_path)
+            except Exception as e2:
+                err(f"Restore error: {e2}")
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                return
+        else:
+            err(f"Restore error: {e}")
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+            return
 
     hash_after = file_hash(main_js_path)
     resign_macos_bundle(main_js_path)

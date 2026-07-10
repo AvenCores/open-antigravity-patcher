@@ -243,13 +243,56 @@ def find_main_js(root):
 
 
 def get_ag_version(main_js_path):
-    """Читает версию Antigravity IDE из реестра Windows или package.json на Linux.
+    """Читает версию Antigravity IDE из реестра Windows, Info.plist на macOS или package.json на Linux.
     Возвращает (version_str, is_pkg_mgr).
     """
+    # macOS: читаем версию из Info.plist
+    if sys.platform == "darwin":
+        # Ищем .app-бандл, поднимаясь от main.js
+        app_path = ""
+        p = os.path.dirname(main_js_path)
+        while p and p != os.path.dirname(p):
+            if p.endswith(".app"):
+                app_path = p
+                break
+            p = os.path.dirname(p)
+
+        if app_path:
+            plist_path = os.path.join(app_path, "Contents", "Info.plist")
+            if os.path.exists(plist_path):
+                try:
+                    import plistlib
+                    with open(plist_path, "rb") as f:
+                        plist = plistlib.load(f)
+                    ver = plist.get("CFBundleShortVersionString", "").strip()
+                    if not ver:
+                        ver = plist.get("CFBundleVersion", "").strip()
+                    if ver:
+                        return ver, False
+                except Exception:
+                    pass
+
+        # Fallback: package.json
+        for rel in (
+            os.path.join(os.path.dirname(main_js_path), "..", "package.json"),
+            os.path.join(os.path.dirname(main_js_path), "package.json"),
+        ):
+            pkg = os.path.normpath(rel)
+            if os.path.exists(pkg):
+                try:
+                    with open(pkg, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    ver = data.get("version", "").strip()
+                    if ver:
+                        return ver, False
+                except Exception:
+                    pass
+        return None, False
+
     if os.name == "posix":
         # Пробуем менеджеры пакетов (apt, rpm) с разными именами
         pkg_names = ["antigravity-ide", "antigravity-ide-bin", "antigravity-ide-custom"]
-        
+
         # dpkg-query (Debian/Ubuntu)
         for pkg in pkg_names:
             try:
@@ -324,12 +367,17 @@ def check_ag_version(main_js_path):
 
     try:
         detected = Version(ver_str)
-        
-        # Минимальная версия: 1.107.0 для кастомных Linux билдов, иначе MIN_AG_VERSION
+
+        # Минимальная версия зависит от платформы:
+        # - macOS: 1.107.0 (кастомные билды через Homebrew/DMG)
+        # - Linux без пакетного менеджера: 1.107.0 (кастомные билды)
+        # - Иначе: MIN_AG_VERSION (из реестра Windows или пакетного менеджера)
         min_ver_str = MIN_AG_VERSION
-        if os.name == "posix" and sys.platform != "darwin" and not is_pkg_mgr:
+        if sys.platform == "darwin" and not is_pkg_mgr:
             min_ver_str = "1.107.0"
-            
+        elif os.name == "posix" and sys.platform != "darwin" and not is_pkg_mgr:
+            min_ver_str = "1.107.0"
+
         minimum = Version(min_ver_str)
         status = VersionStatus.OK if detected >= minimum else VersionStatus.TOO_OLD
         return status, ver_str

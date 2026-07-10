@@ -109,6 +109,43 @@ def find_app_bundle(path):
     return ""
 
 
+def remove_macos_immutable_flags(path):
+    """Снимает флаги uchg/schg с файла или директории на macOS.
+
+    На macOS файлы внутри .app-бандлов могут иметь флаги immutable,
+    которые блокируют запись даже для root. Вызывать перед попыткой
+    записи в .app-бандл.
+    """
+    import sys
+    if sys.platform != "darwin":
+        return
+    try:
+        subprocess.run(
+            ["chflags", "-R", "nouchg", path],
+            check=False, capture_output=True, timeout=30,
+        )
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+
+
+def remove_macos_quarantine(path):
+    """Снимает атрибут com.apple.quarantine с .app-бандла."""
+    import sys
+    if sys.platform != "darwin":
+        return
+    try:
+        subprocess.run(
+            ["xattr", "-dr", "com.apple.quarantine", path],
+            check=False, capture_output=True, timeout=30,
+        )
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+
+
 def resign_macos_bundle(main_js_path):
     """Переподписывает .app ad-hoc подписью после изменения main.js.
 
@@ -145,13 +182,7 @@ def resign_macos_bundle(main_js_path):
         warn(f"codesign failed: {stderr}")
         return
 
-    try:
-        subprocess.run(
-            ["xattr", "-dr", "com.apple.quarantine", app_path],
-            check=False, capture_output=True, timeout=30,
-        )
-    except FileNotFoundError:
-        pass
+    remove_macos_quarantine(app_path)
 
 
 def resign_macos_binary(path):
