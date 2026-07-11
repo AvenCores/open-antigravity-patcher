@@ -16,6 +16,7 @@ main.js
 app/
 app_original.asar
 dist/
+.vscode/
 
 # AI agents
 .kimchi/

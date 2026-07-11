@@ -37,6 +37,7 @@ from patcher.utils.file import (
     resign_macos_bundle,
     remove_macos_immutable_flags,
     remove_macos_quarantine,
+    find_app_bundle,
 )
 from patcher.ide.discovery import (
     check_ag_version,
@@ -372,8 +373,10 @@ def do_patch(main_js_path, show_search_line=False):
         info("Creating backup...")
         # На macOS снимаем immutable-флаги перед записью в .app-бандл
         if sys.platform == "darwin":
-            app_dir = os.path.dirname(os.path.dirname(main_js_path))
-            remove_macos_immutable_flags(app_dir)
+            app_path = find_app_bundle(main_js_path)
+            if app_path:
+                remove_macos_immutable_flags(app_path)
+                remove_macos_quarantine(app_path)
         try:
             shutil.copy2(main_js_path, backup_path)
             fix_posix_permissions(backup_path)
@@ -383,9 +386,10 @@ def do_patch(main_js_path, show_search_line=False):
             # На macOS повторяем попытку после снятия флагов
             if sys.platform == "darwin":
                 warn(f"Permission denied, retrying after removing flags...")
-                app_dir = os.path.dirname(os.path.dirname(main_js_path))
-                remove_macos_immutable_flags(app_dir)
-                remove_macos_quarantine(app_dir)
+                app_path = find_app_bundle(main_js_path)
+                if app_path:
+                    remove_macos_immutable_flags(app_path)
+                    remove_macos_quarantine(app_path)
                 try:
                     shutil.copy2(main_js_path, backup_path)
                     fix_posix_permissions(backup_path)
@@ -437,9 +441,10 @@ def do_patch(main_js_path, show_search_line=False):
                 # На macOS снимаем immutable-флаги перед повторной попыткой
                 if sys.platform == "darwin":
                     warn(f"Permission denied, retrying after removing flags...")
-                    app_dir = os.path.dirname(os.path.dirname(main_js_path))
-                    remove_macos_immutable_flags(app_dir)
-                    remove_macos_quarantine(app_dir)
+                    app_path = find_app_bundle(main_js_path)
+                    if app_path:
+                        remove_macos_immutable_flags(app_path)
+                        remove_macos_quarantine(app_path)
                     time.sleep(0.5)
                     continue
                 warn(f"Permission denied (file locked): {e}")
@@ -632,8 +637,10 @@ def do_restore(main_js_path, show_search_line=False):
     try:
         # На macOS снимаем immutable-флаги перед записью в .app-бандл
         if sys.platform == "darwin":
-            app_dir = os.path.dirname(os.path.dirname(main_js_path))
-            remove_macos_immutable_flags(app_dir)
+            app_path = find_app_bundle(main_js_path)
+            if app_path:
+                remove_macos_immutable_flags(app_path)
+                remove_macos_quarantine(app_path)
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(data)
         os.replace(tmp_path, main_js_path)
@@ -642,9 +649,10 @@ def do_restore(main_js_path, show_search_line=False):
         # На macOS повторяем попытку после снятия флагов
         if sys.platform == "darwin":
             warn(f"Restore failed, retrying after removing flags...")
-            app_dir = os.path.dirname(os.path.dirname(main_js_path))
-            remove_macos_immutable_flags(app_dir)
-            remove_macos_quarantine(app_dir)
+            app_path = find_app_bundle(main_js_path)
+            if app_path:
+                remove_macos_immutable_flags(app_path)
+                remove_macos_quarantine(app_path)
             try:
                 if not os.path.exists(tmp_path):
                     with open(tmp_path, "w", encoding="utf-8") as f:
