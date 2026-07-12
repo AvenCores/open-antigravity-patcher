@@ -132,20 +132,19 @@ def _patch_ineligible_screen(content):
 def apply_patches_minimal(content, ag_version=None):
     """Для v1.22+: version-aware auth patch + ideName + ineligible."""
     results = []
-    for patch_fn in (_patch_is_google_internal, _patch_ide_name, _patch_ineligible_screen):
+    for patch_fn in (_patch_ide_name, _patch_ineligible_screen):
         content, result = patch_fn(content)
         results.append(result)
     content, result = _patch_is_google_internal_comma(content, ag_version=ag_version)
-    results.insert(1, result)
+    results.insert(0, result)
     return content, results
 
 
 def is_already_patched(content):
-    # Убраны прямой и auth-вариант isGoogleInternal, ideName пропатчен
-    has_unpatched_simple = bool(re.search(r'if\(this\.[a-zA-Z_$]+\.isGoogleInternal\)', content))
+    # Убран auth-вариант isGoogleInternal, ideName пропатчен
     has_unpatched_auth = bool(RE_AUTH_IS_GOOGLE_INTERNAL.search(content))
     has_ide = 'ideName:"antigravity-insiders"' in content
-    return not has_unpatched_simple and not has_unpatched_auth and has_ide
+    return not has_unpatched_auth and has_ide
 
 
 def get_user_settings_path():

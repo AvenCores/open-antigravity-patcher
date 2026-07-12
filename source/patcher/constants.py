@@ -1,7 +1,7 @@
 import re
 from packaging.version import Version
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 MIN_AG_VERSION = "2.1.1"
 MIN_ANTIGRAVITY_VERSION = "2.2.1"
 AUTH_PATCH_SWITCH_VERSION = Version("1.23")
@@ -136,20 +136,11 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
     const patchFrontendMainJs = (content) => {
         const results = [];
         if (content.includes('csrfToken') && content.includes('isGoogleInternal')) {
-            let nextContent = content.split('isGoogleInternal:!1').join('isGoogleInternal:!0');
-            let applied = nextContent !== content;
-            results.push({
-                name: 'isGoogleInternal:!1 -> isGoogleInternal:!0 (frontend)',
-                applied,
-                detail: applied ? 'Forced frontend isGoogleInternal to true' : 'isGoogleInternal:!1 not found',
-            });
-            content = nextContent;
-            
             const oldLs = 'function Ls(a,b){return kka(a,c=>{switch(c.methodKind){case "unary":return tka(b,c);case "server_streaming":return uka(b,c);case "client_streaming":return vka(b,c);case "bidi_streaming":return wka(b,c);default:return null}})}';
-            const newLs = 'function Ls(a,b){var client=kka(a,c=>{switch(c.methodKind){case "unary":return tka(b,c);case "server_streaming":return uka(b,c);case "client_streaming":return vka(b,c);case "bidi_streaming":return wka(b,c);default:return null}});try{var wrap=function(name,mockFn){var orig=client[name];if(typeof orig==="function"){client[name]=async function(...args){try{var res=await orig.apply(client,args);return mockFn(res)}catch(e){console.error("[Wrapper Error] "+name+":",e);return mockFn(null)}}}};wrap("hasAuthToken",function(res){if(!res||!res.hasToken){return{hasToken:true,isGcpTos:false}}return res});wrap("getAuthStatus",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("validateProject",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("loginWithBrowser",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("getUserStatus",function(res){if(!res||!res.userStatus){return{userStatus:{disableTelemetry:false,userDataCollectionForceDisabled:false,userTier:res?.userStatus?.userTier||{name:"Google Internal",upgradeButtonText:""}}}}return res})}catch(err){console.error("[Wrapper Init Error]:",err)}return client}';
+            const newLs = 'function Ls(a,b){var client=kka(a,c=>{switch(c.methodKind){case "unary":return tka(b,c);case "server_streaming":return uka(b,c);case "client_streaming":return vka(b,c);case "bidi_streaming":return wka(b,c);default:return null}});try{var wrap=function(name,mockFn){var orig=client[name];if(typeof orig==="function"){client[name]=async function(...args){try{var res=await orig.apply(client,args);return mockFn(res)}catch(e){console.error("[Wrapper Error] "+name+":",e);return mockFn(null)}}}};wrap("hasAuthToken",function(res){if(!res||!res.hasToken){return{hasToken:true,isGcpTos:false}}return res});wrap("getAuthStatus",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("validateProject",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("loginWithBrowser",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("getUserStatus",function(res){if(!res||!res.userStatus){return{userStatus:{disableTelemetry:false,userDataCollectionForceDisabled:false,userTier:res?.userStatus?.userTier||{name:"Pro",upgradeButtonText:""}}}}return res})}catch(err){console.error("[Wrapper Init Error]:",err)}return client}';
             
-            nextContent = content.split(oldLs).join(newLs);
-            applied = nextContent !== content;
+            const nextContent = content.split(oldLs).join(newLs);
+            const applied = nextContent !== content;
             results.push({
                 name: 'Mock auth client wrapper (frontend)',
                 applied,
@@ -168,10 +159,8 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
     };
     const isFrontendMainPatched = (content) => {
         if (content.includes('csrfToken') && content.includes('isGoogleInternal')) {
-            const internalPatched = !content.includes('isGoogleInternal:!1')
-                && content.includes('isGoogleInternal:!0');
             const clientWrapperPatched = content.includes('wrap("hasAuthToken"');
-            return internalPatched && clientWrapperPatched;
+            return clientWrapperPatched;
         }
         return false;
     };
