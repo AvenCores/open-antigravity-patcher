@@ -140,7 +140,7 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 - Применение и откат патча через простое меню.
 - Поддержка путей `resources/app/out/main.js` и `resources/app/main.js`.
 - Цветной вывод и попытка автоматического повышения прав (UAC на Windows, предложение `sudo` на Linux).
-- Проверка минимальной версии Antigravity IDE (>= `2.0.1`) перед применением патча.
+- Проверка минимальной версии Antigravity IDE (>= `2.1.1`) перед применением патча.
 - Определение версии Antigravity IDE через реестр Windows, пакетный менеджер на Linux или `package.json` на macOS.
 - Обнаружение уже применённого патча с предложением применить повторно.
 - Временный runtime workaround для Antigravity IDE `1.23+`: фиксация стабильного Cloud Code endpoint и отключение проблемных Cascade/model experiments через `settings.json`.
@@ -401,7 +401,7 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 | **Linux (portable/snap/flatpak)** | `package.json` рядом с `main.js` |
 | **macOS** | `package.json` в `Antigravity IDE.app/Contents/Resources/app/` |
 
-Если версия не определена, патчер предлагает продолжить без проверки. Если версия ниже `1.22.2` — предупреждает и также предлагает выбор.
+Если версия не определена, патчер предлагает продолжить без проверки. Если версия ниже `2.1.1` — предупреждает и также предлагает выбор.
 
 ## 🔒 Проверка уже применённого патча
 
@@ -461,8 +461,9 @@ xcode-select --install
   - **Windows** — полная поддержка автопоиска через реестр и UAC.
   - **Linux** — автопоиск в `/usr/share/antigravity-ide`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
   - **macOS** — автопоиск в `/Applications/Antigravity IDE.app` и `~/Applications/Antigravity IDE.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
-- **Минимальная версия Antigravity**: `2.0.1`
-- **Поддерживаемые версии**: `2.0.1` и выше (с версионным выбором auth-паттерна для `1.23+`)
+- **Минимальная версия Antigravity (standalone)**: `2.3.0`
+- **Минимальная версия Antigravity IDE**: `2.1.1`
+- **Поддерживаемые версии**: `2.3.0` и выше для standalone, `2.1.1` и выше для IDE (с версионным выбором auth-паттерна для `1.23+`)
 
 ## 🛠️ Сборка
 
