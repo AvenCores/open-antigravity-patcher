@@ -83,7 +83,7 @@ def _detect_arch(path):
     """Возвращает 'arm64', 'x86_64' или 'unknown' по заголовку бинаря."""
     try:
         with open(path, "rb") as f:
-            hdr = f.read(8)
+            hdr = f.read(64)
         if len(hdr) < 8:
             return "unknown"
         magic = hdr[:4]
@@ -95,6 +95,20 @@ def _detect_arch(path):
                 return "x86_64"
         elif hdr[:2] == b"MZ":                    # Windows PE → всегда x86_64
             return "x86_64"
+        elif magic == b"\x7fELF":                 # Linux ELF
+            if len(hdr) >= 20:
+                endian = hdr[5]
+                if endian == 1:                   # Little Endian
+                    machine = struct.unpack_from("<H", hdr, 18)[0]
+                elif endian == 2:                 # Big Endian
+                    machine = struct.unpack_from(">H", hdr, 18)[0]
+                else:
+                    return "unknown"
+
+                if machine == 62:                 # EM_X86_64
+                    return "x86_64"
+                elif machine == 183:              # EM_AARCH64 (ARM64)
+                    return "arm64"
     except OSError:
         pass
     return "unknown"
