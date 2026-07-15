@@ -67,14 +67,14 @@ CLI_GATE = Gate(
     desc="eligibility screen off",
 )
 
-# ARM64 (Apple Silicon): handleAuthResult проверяет поле ServerBackend+0x1c0
-# (ineligibility-объект): ldr x3,[x0,#0x1c0] ; cbz x3,skip ; mov x0,x3 ; …
-# Патч: заменяем ldr на mov x3,xzr → cbz всегда берёт skip → ineligible-экран не вызывается.
+# ARM64 (Apple Silicon): handleAuthResult проверяет AuthResult.hasValidAuth (байт +8):
+# cbnz x1 ; cbz x0 ; ldrb w3,[x0,#8] ; tbnz w3,#0.
+# Патч: заменяем ldrb на mov w3,#1 → биты w3 всегда 1 → tbnz всегда переходит на success.
 ARM64_CLI_GATE = Gate(
-    rb"\x03\xe0\x40\xf9...\xb4\xe0\x03\x03\xaa\xe1\x03\x1f\xaa\xe2\x03\x1f\xaa",
-    rb"\xe3\x03\x1f\xaa...\xb4\xe0\x03\x03\xaa\xe1\x03\x1f\xaa\xe2\x03\x1f\xaa",
-    b"\xe3\x03\x1f\xaa",
-    offset=0,
+    rb"\xe1.\x00\xb5\x80.\x00\xb4\x03\x20\x40\x39\x43.\x00\x37",
+    rb"\xe1.\x00\xb5\x80.\x00\xb4\x23\x00\x80\x52\x43.\x00\x37",
+    b"\x23\x00\x80\x52",
+    offset=8,
     desc="eligibility screen off (arm64)",
 )
 
