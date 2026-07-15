@@ -3,7 +3,7 @@ from packaging.version import Version
 
 VERSION = "1.2.3"
 MIN_AG_VERSION = "2.1.1"
-MIN_ANTIGRAVITY_VERSION = "2.2.1"
+MIN_ANTIGRAVITY_VERSION = "2.3.0"
 AUTH_PATCH_SWITCH_VERSION = Version("1.23")
 RUNTIME_SETTINGS_SWITCH_VERSION = Version("1.23")
 CLOUD_CODE_ENDPOINT = "https://cloudcode-pa.googleapis.com"
@@ -139,12 +139,29 @@ ANTIGRAVITY_INJECTION_CODE_TEMPLATE = """
             const oldLs = 'function Ls(a,b){return kka(a,c=>{switch(c.methodKind){case "unary":return tka(b,c);case "server_streaming":return uka(b,c);case "client_streaming":return vka(b,c);case "bidi_streaming":return wka(b,c);default:return null}})}';
             const newLs = 'function Ls(a,b){var client=kka(a,c=>{switch(c.methodKind){case "unary":return tka(b,c);case "server_streaming":return uka(b,c);case "client_streaming":return vka(b,c);case "bidi_streaming":return wka(b,c);default:return null}});try{var wrap=function(name,mockFn){var orig=client[name];if(typeof orig==="function"){client[name]=async function(...args){try{var res=await orig.apply(client,args);return mockFn(res)}catch(e){console.error("[Wrapper Error] "+name+":",e);return mockFn(null)}}}};wrap("hasAuthToken",function(res){if(!res||!res.hasToken){return{hasToken:true,isGcpTos:false}}return res});wrap("getAuthStatus",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("validateProject",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("loginWithBrowser",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("getUserStatus",function(res){if(!res||!res.userStatus){return{userStatus:{disableTelemetry:false,userDataCollectionForceDisabled:false,userTier:res?.userStatus?.userTier||{name:"Pro",upgradeButtonText:""}}}}return res})}catch(err){console.error("[Wrapper Init Error]:",err)}return client}';
             
-            const nextContent = content.split(oldLs).join(newLs);
-            const applied = nextContent !== content;
+            const oldTy = 'function Ty(a,b){return zla(a,c=>{switch(c.methodKind){case "unary":return Ila(b,c);case "server_streaming":return Jla(b,c);case "client_streaming":return Kla(b,c);case "bidi_streaming":return Lla(b,c);default:return null}})}';
+            const newTy = 'function Ty(a,b){var client=zla(a,c=>{switch(c.methodKind){case "unary":return Ila(b,c);case "server_streaming":return Jla(b,c);case "client_streaming":return Kla(b,c);case "bidi_streaming":return Lla(b,c);default:return null}});try{var wrap=function(name,mockFn){var orig=client[name];if(typeof orig==="function"){client[name]=async function(...args){try{var res=await orig.apply(client,args);return mockFn(res)}catch(e){console.error("[Wrapper Error] "+name+":",e);return mockFn(null)}}}};wrap("hasAuthToken",function(res){if(!res||!res.hasToken){return{hasToken:true,isGcpTos:false}}return res});wrap("getAuthStatus",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("validateProject",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("loginWithBrowser",function(res){if(!res||!res.authResult||!res.authResult.hasValidAuth){return{authResult:{hasValidAuth:true,grantedScopes:["https://www.googleapis.com/auth/userinfo.email","https://www.googleapis.com/auth/userinfo.profile"],isGcpTos:false}}}return res});wrap("getUserStatus",function(res){if(!res||!res.userStatus){return{userStatus:{disableTelemetry:false,userDataCollectionForceDisabled:false,userTier:res?.userStatus?.userTier||{name:"Pro",upgradeButtonText:""}}}}return res})}catch(err){console.error("[Wrapper Init Error]:",err)}return client}';
+
+            let nextContent = content;
+            let applied = false;
+            let detail = '';
+
+            if (content.includes(oldLs)) {
+                nextContent = content.split(oldLs).join(newLs);
+                applied = true;
+                detail = 'Injected auth wrapper into Ls factory';
+            } else if (content.includes(oldTy)) {
+                nextContent = content.split(oldTy).join(newTy);
+                applied = true;
+                detail = 'Injected auth wrapper into Ty factory';
+            } else {
+                detail = 'Ls or Ty factory not found';
+            }
+
             results.push({
                 name: 'Mock auth client wrapper (frontend)',
                 applied,
-                detail: applied ? 'Injected auth wrapper into Ls factory' : 'Ls factory not found',
+                detail,
             });
             content = nextContent;
         }
