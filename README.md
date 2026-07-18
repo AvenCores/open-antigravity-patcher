@@ -29,7 +29,7 @@
 
 Опенсорс патчер для Antigravity IDE и standalone-приложения Antigravity: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
 
-![maxresdefault](https://github.com/user-attachments/assets/0c3b73a5-7580-420f-a5d0-277a1db88d11)
+![maxresdefault](https://i.ibb.co/4wvHmd8s/chrome-YMqcl-WCbc-J.png)
 
 # 🎦 Видео гайд по установке и решению проблем
 
@@ -132,6 +132,7 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 ## 🌟 Возможности
 - Автоматический поиск установленного Antigravity IDE, standalone-приложения Antigravity и Antigravity CLI (`agy`) в стандартных путях и реестре Windows.
 - **Патч Antigravity CLI** — снятие экрана «Eligibility Check» в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
+- **Патч Antigravity Manager (`language_server`)** — снятие проверки авторизации (`hasValidAuth=true`) в скомпилированном бинарнике бэкенда по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
 - Полноценная распаковка, модификация и обратная запаковка `app.asar` для Antigravity с сохранением структуры внешних распакованных файлов (`.unpacked`).
 - Интегрированный локальный HTTP-прокси сервер для динамического патчинга загружаемого JS-кода в standalone-приложении Antigravity.
 - Поддержка Linux: поиск по `/usr/share/antigravity-ide`, определение версии через `dpkg`, `rpm` и `package.json`.
@@ -154,11 +155,11 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 |---|---|
 | **PATCH** | |
 | `1` Antigravity IDE patch | Применить патч к `main.js` для Antigravity IDE (bypass region lock) |
-| `2` Antigravity patch | Применить патч к `app.asar` для standalone Antigravity (unlock full app) |
+| `2` Antigravity patch | Меню патчинга standalone Antigravity (интерфейс ASAR и бэкенд language_server) |
 | `3` Antigravity CLI (agy) patch | Применить патч к бинарю `agy`/`agy.exe` (unlock agy tool) |
 | **RESTORE** | |
 | `4` Antigravity IDE | Восстановить оригинальный `main.js` для Antigravity IDE из бэкапа |
-| `5` Antigravity | Восстановить оригинальный `app.asar` для standalone Antigravity из бэкапа |
+| `5` Antigravity | Меню восстановления standalone Antigravity (ASAR и language_server) из бэкапа |
 | `6` Antigravity CLI | Восстановить оригинальный `agy`/`agy.exe` из бэкапа |
 | **TOOLS** | |
 | `7` Fix HTTP 429 | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
@@ -318,6 +319,17 @@ Signature=adhoc
 > **Примечание:** 
 > - Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity IDE `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.
 > - Начиная с v1.0.8 патчер использует **версионный выбор auth-паттерна**: для версий Antigravity IDE < 1.23 применяется старый паттерн, для v1.23+ — новый с дополнительным вызовом `send()`.
+
+### Патч для Antigravity Manager (language_server)
+
+Antigravity Manager (`language_server` или `language_server.exe`) — бэкенд-служба, запускаемая внутри Antigravity. По умолчанию она требует валидную проверку авторизации и лицензии на стороне Google.
+
+Патчер вносит изменения непосредственно в скомпилированный бинарный файл `language_server` по байтовой сигнатуре для двух архитектур:
+- **x86-64** (Intel Mac / Windows / Linux x64): Находит и заменяет проверку `cmp byte ptr [rax + 8], 0` на `mov byte ptr [rax + 8], 1` с последующими `nop` (`\xc6\x40\x08\x01\x90\x90`).
+- **ARM64** (Apple Silicon macOS / ARM64): Находит и заменяет инструкцию `ldr x8, [x1, #8]` (`28 04 40 f9`) на `movz x8, #1` (`28 00 80 d2`).
+
+В результате возвращаемое значение `hasValidAuth` всегда принудительно выставляется в `true`, снимая блокировку.
+Патч обратим через **RESTORE → `5`** восстановлением оригинального бинарника из `.agybak`.
 
 ### Патч для Antigravity CLI (agy)
 
