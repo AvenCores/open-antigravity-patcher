@@ -27,9 +27,9 @@
   <a href="https://github.com/AvenCores/open-antigravity-patcher/issues"><img src="https://img.shields.io/github/issues/AvenCores/open-antigravity-patcher?style=for-the-badge" alt="GitHub issues"></a>
 </p>
 
-Опенсорс патчер для Antigravity IDE и standalone-приложения Antigravity: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
+Опенсорс патчер для Antigravity 2.0, Antigravity IDE и Antigravity CLI: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
 
-![maxresdefault](https://i.ibb.co/4wvHmd8s/chrome-YMqcl-WCbc-J.png)
+![maxresdefault](https://i.ibb.co/TD2spJ5r/chrome-0y4-SDd-RSiq.png)
 
 # 🎦 Видео гайд по установке и решению проблем
 
@@ -96,8 +96,8 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 **Важно:** использование VPN, прокси или других способов обхода ограничений может детектироваться Google и приводить к этой ошибке. Google активно борется с методами обхода, и если ваш IP-адрес или другие параметры сессии вызывают подозрение, доступ может быть заблокирован.
 
 **Решение:**
-1. Если вы используете Antigravity IDE версии **1.23.0 или выше**, примените патч (**PATCH → `1`: Antigravity IDE patch**). Патчер автоматически добавит в `settings.json` необходимые параметры для обхода этой ошибки (подробнее в разделе [Временный runtime settings workaround](#5-временный-runtime-settings-workaround-v123)).
-2. Если патч уже применен или версия ниже 1.23, попробуйте сменить аккаунт Google или использовать другой VPN.
+1. Примените патч (**PATCH → `1`: Antigravity IDE patch**). Патчер настроит корректный обход `isGoogleInternal` на уровне кода.
+2. Если патч уже применен, попробуйте сменить аккаунт Google или использовать другой VPN.
 3. Попробуйте использовать **[Xbox DNS](https://xbox-dns.ru/)**, **[dns.malw.link](https://info.dns.malw.link/)**, **[GeoHide](https://dns.geohide.ru:8443/)** (специальные DNS-серверы для обхода ограничений на ПК или роутере).
 
 **Пример ошибки:**
@@ -130,13 +130,11 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 - [5xx Server Errors: The Complete Guide](https://komodor.com/learn/5xx-server-errors-the-complete-guide/) — подробный разбор серверных ошибок.
 
 ## 🌟 Возможности
-- Автоматический поиск установленного Antigravity IDE, standalone-приложения Antigravity и Antigravity CLI (`agy`) в стандартных путях и реестре Windows.
+- Автоматический поиск установленного Antigravity 2.0, Antigravity IDE и Antigravity CLI (`agy`) в стандартных путях и реестре Windows.
 - **Патч Antigravity CLI** — снятие экрана «Eligibility Check» в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
 - **Патч Antigravity Manager (`language_server`)** — снятие проверки авторизации (`hasValidAuth=true`) в скомпилированном бинарнике бэкенда по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
-- Полноценная распаковка, модификация и обратная запаковка `app.asar` для Antigravity с сохранением структуры внешних распакованных файлов (`.unpacked`).
-- Интегрированный локальный HTTP-прокси сервер для динамического патчинга загружаемого JS-кода в standalone-приложении Antigravity.
 - Поддержка Linux: поиск по `/usr/share/antigravity-ide`, определение версии через `dpkg`, `rpm` и `package.json`.
-- Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js` или `app.asar`.
+- Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js`.
 - Создание резервной копии перед изменениями.
 - Применение и откат патча через простое меню.
 - Поддержка путей `resources/app/out/main.js` и `resources/app/main.js`.
@@ -144,10 +142,9 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 - Проверка минимальной версии Antigravity IDE (>= `2.1.1`) перед применением патча.
 - Определение версии Antigravity IDE через реестр Windows, пакетный менеджер на Linux или `package.json` на macOS.
 - Обнаружение уже применённого патча с предложением применить повторно.
-- Временный runtime workaround для Antigravity IDE `1.23+`: фиксация стабильного Cloud Code endpoint и отключение проблемных Cascade/model experiments через `settings.json`.
 
 ## 🚀 Как использовать
-1. Закройте Antigravity IDE или Antigravity.
+1. Закройте Antigravity IDE или Antigravity 2.0.
 2. Запустите патчер от имени администратора (скрипт сам запросит повышение прав при необходимости).
 3. В меню выберите нужное действие:
 
@@ -155,11 +152,11 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 |---|---|
 | **PATCH** | |
 | `1` Antigravity IDE patch | Применить патч к `main.js` для Antigravity IDE (bypass region lock) |
-| `2` Antigravity patch | Меню патчинга standalone Antigravity (интерфейс ASAR и бэкенд language_server) |
+| `2` Antigravity 2.0 patch | Применить патч к бинарному файлу `language_server` (Antigravity Manager) |
 | `3` Antigravity CLI (agy) patch | Применить патч к бинарю `agy`/`agy.exe` (unlock agy tool) |
 | **RESTORE** | |
 | `4` Antigravity IDE | Восстановить оригинальный `main.js` для Antigravity IDE из бэкапа |
-| `5` Antigravity | Меню восстановления standalone Antigravity (ASAR и language_server) из бэкапа |
+| `5` Antigravity 2.0 | Восстановить оригинальный `language_server` из бэкапа |
 | `6` Antigravity CLI | Восстановить оригинальный `agy`/`agy.exe` из бэкапа |
 | **TOOLS** | |
 | `7` Fix HTTP 429 | Сброс конфигурации для исправления ошибки 429 (сохраняет диалоги) |
@@ -172,16 +169,16 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 python main.py
 ```
 
-Запуск с указанием пути (для Antigravity IDE, standalone Antigravity или Antigravity CLI):
+Запуск с указанием пути (для Antigravity IDE, Antigravity 2.0 или Antigravity CLI):
 ```bash
 # Windows
 python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity IDE"
-python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity\\resources\\app.asar"
+python main.py "C:\\Users\\<username>\\AppData\\Local\\Programs\\Antigravity\\resources\\bin\\language_server.exe"
 python main.py "C:\\Users\\<username>\\AppData\\Local\\agy\\bin\\agy.exe"
 
 # Linux
 python main.py /usr/share/antigravity-ide
-python main.py /opt/Antigravity
+python main.py /opt/Antigravity/resources/bin/language_server
 python main.py /usr/local/bin/agy
 
 # macOS
@@ -190,7 +187,7 @@ python3 main.py /Applications/Antigravity.app
 python3 main.py /usr/local/bin/agy
 ```
 
-Если `main.js` или `app.asar` находится рядом со скриптом, путь указывать не нужно — они будут найдены автоматически.
+Если `main.js` или `language_server` находится рядом со скриптом, путь указывать не нужно — они будут найдены автоматически.
 
 > **macOS:** если `Antigravity IDE.app` лежит в `/Applications`, запись потребует `sudo` (скрипт сам предложит перезапуск). Для установки в `~/Applications` или пользовательскую директорию `sudo` не нужен. После успешного патча `.app` автоматически переподписывается ad-hoc подписью (`codesign --force --deep --sign -`) — без этого Electron с Hardened Runtime не запустится на macOS.
 
@@ -205,13 +202,13 @@ python3 main.py /usr/local/bin/agy
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
-2. Полностью закройте Antigravity или Antigravity IDE.
+2. Полностью закройте Antigravity 2.0 или Antigravity IDE.
 3. Запустите патчер, указав путь к приложению:
    ```bash
    # Для Antigravity IDE
    python3 main.py "/Applications/Antigravity IDE.app"
    
-   # Для standalone-версии Antigravity
+   # Для Antigravity 2.0
    python3 main.py "/Applications/Antigravity.app"
    ```
    *Примечание: Если приложение находится в папке `/Applications`, скрипт автоматически запросит повышение прав (`sudo`) для записи.*
@@ -233,11 +230,11 @@ xattr -dr com.apple.quarantine Open_AG_Patcher_macOS
 #### Что выбрать в меню
 Используйте:
 - **PATCH → `1`** (Antigravity IDE patch) для `Antigravity IDE.app`
-- **PATCH → `2`** (Antigravity patch) для standalone `Antigravity.app`
+- **PATCH → `2`** (Antigravity 2.0 patch) для `Antigravity.app` (бэкенд language_server)
 - **PATCH → `3`** (Antigravity CLI (agy) patch) для бинаря `agy` (если установлен)
 - **RESTORE → `4`**, `5` или `6` для восстановления из бэкапа
 
-Для standalone `Antigravity.app` патчер обычно сам находит:
+Для `Antigravity.app` патчер обычно сам находит:
 ```text
 /Applications/Antigravity.app
 ```
@@ -261,68 +258,15 @@ Signature=adhoc
 
 ### Патч для Antigravity IDE
 
-Патчер вносит **4 правки** в `main.js` и применяет отдельный временный runtime workaround в пользовательском `settings.json`. Изменения `main.js` обратимы через резервную копию (`main.js.bak`), а `settings.json` сохраняется в отдельный backup перед записью.
+Патчер вносит изменения в `main.js` для обхода проверки `isGoogleInternal`. Изменения обратимы через резервную копию (`main.js.bak`).
 
-### 1. `if(isGoogleInternal)` → `if(true)`
-Заменяет проверку флага `isGoogleInternal` на безусловное `true`, снимая региональные/внутренние ограничения. Применяется ко всем вхождениям в файле (паттерн `if(this.<svc>.isGoogleInternal)`).
+### `resetIsTierGCPTos(),this.XXX.isGoogleInternal` → `resetIsTierGCPTos(),true`
+Заменяет проверку флага `isGoogleInternal` после вызова `resetIsTierGCPTos()` в сервисе авторизации на безусловное `true`, активируя внутренний путь доступа Google. После применения патча автоматически очищаются папки кэша VS Code (`CachedData` и `Code Cache/js`), принуждая IDE перекомпилировать пропатченный JS-код.
 
-### 2. `if(X(),this.Y.isGoogleInternal)` → `if(X(),true)` (auth service)
-Аuth service проверяет различные паттерны в зависимости от версии:
-- **v1.22–v1.22.x:** `if(this.w.resetIsTierGCPTos(),this.t.isGoogleInternal)` → `if(this.w.resetIsTierGCPTos(),true)`
-- **v1.23+:** `if(this.t.send({...}),this.y.resetIsTierGCPTos(),this.w.isGoogleInternal)` → `if(this.t.send({...}),this.y.resetIsTierGCPTos(),true)`
-
-Патчер автоматически определяет версию Antigravity IDE и применяет соответствующий паттерн для корректного обхода авторизации.
-
-### 3. `ideName` → `"antigravity-insiders"`
-Заменяет `ideName:"antigravity"` на `ideName:"antigravity-insiders"` для корректной идентификации клиента.
-
-### 4. Экран `ineligible` — обход (v1.22+)
-Заменяет spread тернар `...s?{}:{errorType:"ineligible",reason:a,verificationUrl:i}` на `...s?{}:{}` — ошибка ineligible не отправляется, экран блокировки не показывается.
-
-### 5. Временный runtime settings workaround (v1.23+)
-Начиная с Antigravity IDE `1.23+` часть пользователей после обновления получает ошибку:
-
-```json
-{
-  "error": {
-    "code": 400,
-    "message": "User location is not supported for the API use.",
-    "status": "FAILED_PRECONDITION"
-  }
-}
-```
-
-В логах при этом появляются запросы к `daily-cloudcode-pa.googleapis.com` и новые Cascade/model experiments. Это временное решение: его стоит убрать или пересмотреть, когда Antigravity IDE стабилизирует новый маршрут/эксперимент или вернёт совместимое поведение. Workaround добавляет в пользовательский `settings.json`:
-
-```json
-{
-  "jetski.cloudCodeUrl": "https://cloudcode-pa.googleapis.com",
-  "codeiumDev.forceDisableExperiments": "CASCADE_DEFAULT_MODEL_OVERRIDE,CASCADE_USE_EXPERIMENT_CHECKPOINTER,CASCADE_NEW_MODELS_NUX,CASCADE_NEW_WAVE_2_MODELS_NUX",
-  "codeiumDev.languageServerEnv": {
-    "BORG_DISABLE_EXPERIMENTS": "CASCADE_DEFAULT_MODEL_OVERRIDE,CASCADE_USE_EXPERIMENT_CHECKPOINTER,CASCADE_NEW_MODELS_NUX,CASCADE_NEW_WAVE_2_MODELS_NUX",
-    "BORG_EXPERIMENTS": ""
-  }
-}
-```
-
-Если `settings.json` уже существует, перед изменением создаётся резервная копия вида `settings.json.bak-YYYYMMDD-HHMMSS`. Если `main.js` уже пропатчен, **PATCH → `1`** всё равно применит runtime workaround без необходимости повторно менять `main.js`.
-
-### Патч для Standalone Antigravity (ASAR)
-
-Для standalone-версии Antigravity процесс патчинга отличается из-за того, что логика интерфейса загружается динамически из сети:
-1. Оригинальный архив копируется в резервную копию `app.asar.bak` (или `app1.asar.bak`) для возможности последующего отката, а сам архив распаковывается во временную папку.
-2. В файле `dist/main.js` регистрируется перехватчик сетевых запросов.
-3. При запуске Antigravity все запросы к фронтенд-скриптам (`/main.js`) перенаправляются на локальный HTTP-прокси сервер, создаваемый внутри самого приложения.
-4. Прокси-сервер скачивает оригинальный фронтенд-скрипт, на лету подменяет в нем проверки `isGoogleInternal` на `true`, а также модифицирует централизованную фабрику gRPC-клиентов `Ls(a, b)`. В фабрику внедряется обертка, которая напрямую переопределяет 5 ключевых унарных методов авторизации и статуса (`hasAuthToken`, `getAuthStatus`, `validateProject`, `loginWithBrowser`, `getUserStatus`). При обнаружении региональной блокировки эти методы возвращают успешный статус авторизации, имитируя внутренний аккаунт Google. Все остальные методы (включая стриминговые асинхронные генераторы) остаются нетронутыми, что полностью предотвращает сбои асинхронной итерации и зависание приложения с темным экраном.
-5. Измененные файлы запаковываются обратно в `app.asar` с корректным вычислением хэшей целостности (SHA256 blocks) и сохранением структуры внешних распакованных файлов (`.unpacked`).
-
-> **Примечание:** 
-> - Патч `onboardUser injection` отключён начиная с v1.22+, так как в новых версиях Antigravity IDE `onboardUser` уже вызывается нативно, и инъекция дублирует вызов, ломая поток авторизации.
-> - Начиная с v1.0.8 патчер использует **версионный выбор auth-паттерна**: для версий Antigravity IDE < 1.23 применяется старый паттерн, для v1.23+ — новый с дополнительным вызовом `send()`.
 
 ### Патч для Antigravity Manager (language_server)
 
-Antigravity Manager (`language_server` или `language_server.exe`) — бэкенд-служба, запускаемая внутри Antigravity. По умолчанию она требует валидную проверку авторизации и лицензии на стороне Google.
+Antigravity Manager (`language_server` или `language_server.exe`) — бэкенд-служба, запускаемая внутри Antigravity 2.0. По умолчанию она требует валидную проверку авторизации и лицензии на стороне Google.
 
 Патчер вносит изменения непосредственно в скомпилированный бинарный файл `language_server` по байтовой сигнатуре для двух архитектур:
 - **x86-64** (Intel Mac / Windows / Linux x64): Находит и заменяет проверку `cmp byte ptr [rax + 8], 0` на `mov byte ptr [rax + 8], 1` с последующими `nop` (`\xc6\x40\x08\x01\x90\x90`).
@@ -420,9 +364,7 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 
 Перед патчингом скрипт проверяет, не был ли файл уже пропатчен, по двум признакам:
 - отсутствие `if(this.X.isGoogleInternal)` (паттерн заменён на `if(true)`)
-- наличие строки `"antigravity-insiders"`
-
-Если оба признака найдены, выдаётся предупреждение с запросом подтверждения повторного применения.
+- отсутствие немодифицированных `isGoogleInternal` (comma-based auth check).
 
 ## 🛡️ Повышение прав
 
@@ -474,9 +416,9 @@ xcode-select --install
   - **Windows** — полная поддержка автопоиска через реестр и UAC.
   - **Linux** — автопоиск в `/usr/share/antigravity-ide`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
   - **macOS** — автопоиск в `/Applications/Antigravity IDE.app` и `~/Applications/Antigravity IDE.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
-- **Минимальная версия Antigravity (standalone)**: `2.3.0`
+- **Минимальная версия Antigravity 2.0**: `2.3.0`
 - **Минимальная версия Antigravity IDE**: `2.1.1`
-- **Поддерживаемые версии**: `2.3.0` и выше для standalone, `2.1.1` и выше для IDE (с версионным выбором auth-паттерна для `1.23+`)
+- **Поддерживаемые версии**: `2.3.0` и выше для Antigravity 2.0, `2.1.1` и выше для IDE
 
 ## 🛠️ Сборка
 
@@ -519,12 +461,12 @@ xcode-select --install
 
 - `source/main.py` — основная точка входа в патчер (выполняет проверку прав доступа и запуск CLI).
 - `source/patcher/` — основной исходный код патчера с модульной архитектурой:
-  - `constants.py` — глобальные константы, регулярные выражения, версии и шаблоны инъекций.
+  - `constants.py` — глобальные константы, регулярные выражения, версии.
   - `cli.py` — консольный интерфейс пользователя, меню и обработка ввода.
   - `utils/` — системные вспомогательные утилиты (цвета консоли, права администратора, POSIX-права, хэширование файлов).
   - `ide/` — логика поиска и патчинга непосредственно Antigravity IDE (файлы `main.js`).
-  - `asar/` — логика распаковки/упаковки архивов ASAR и патчинга приложения Antigravity.
   - `agy/` — логика поиска и байт-сигнатурного патчинга бинаря Antigravity CLI (`agy`/`agy.exe`).
+  - `manager/` — логика поиска и байт-сигнатурного патчинга бинаря Antigravity Manager (`language_server`/`language_server.exe`).
 - `source/requirements.txt` — зависимости для сборки и запуска.
 - `source/build.txt` — примеры команд сборки под разные ОС.
 - `source/icon.ico` — иконка для `exe`/`app`.

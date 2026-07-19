@@ -409,26 +409,3 @@ def resolve_target_path(raw_path):
         return found if found else resolved
     return resolved
 
-
-def assign_custom_path(raw_path):
-    from patcher.asar.discovery import resolve_antigravity_paths
-
-    resolved = resolve_target_path(raw_path)
-    if not os.path.exists(resolved):
-        return None, None
-        
-    if os.path.isfile(resolved) and resolved.endswith("main.js"):
-        return resolved, None
-        
-    asar_path, _ = resolve_antigravity_paths(resolved)
-    if os.path.exists(asar_path):
-        return None, resolved
-        
-    main_js = find_main_js(resolved)
-    if main_js:
-        return main_js, None
-        
-    if os.path.isfile(resolved):
-        return resolved, None
-    else:
-        return None, resolved

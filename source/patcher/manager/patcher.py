@@ -4,8 +4,10 @@ import mmap
 import shutil
 import contextlib
 import filecmp
+from packaging.version import Version
+from enum import Enum
 
-from patcher.constants import COLOR_CYAN
+from patcher.constants import COLOR_CYAN, MIN_ANTIGRAVITY_VERSION
 from patcher.utils.console import (
     color,
     info,
@@ -27,6 +29,13 @@ from patcher.utils.file import (
 from patcher.utils.admin import terminate_processes
 
 BAK_EXT = ".agybak"
+
+
+class VersionStatus(Enum):
+    OK = "ok"
+    TOO_OLD = "too_old"
+    NOT_FOUND = "not_found"
+    PARSE_ERROR = "parse_error"
 
 
 class Gate:
@@ -53,6 +62,7 @@ class Gate:
 # cmp byte[rax+8],0 ; je short  ->  mov byte[rax+8],1 ; nop*2 (x64)
 # ldr x8, [x1, #8] -> movz x8, #1 (arm64)
 # (hasValidAuth=true)
+# (wildcarded/re.S displacements)
 MANAGER_GATES = [
     Gate(
         rb"\x80\x78\x08\x00\x74.\x48\x8b.\x24.\x48\x89.\x60",
@@ -69,6 +79,22 @@ MANAGER_GATES = [
         desc="hasValidAuth=true (arm64)",
     )
 ]
+
+
+from patcher.manager.discovery import find_asar_relative_to_manager, read_package_json_from_asar
+
+def check_antigravity_version(asar_path):
+    ver_str = read_package_json_from_asar(asar_path)
+    if ver_str is None:
+        return VersionStatus.NOT_FOUND, None
+
+    try:
+        detected = Version(ver_str)
+        minimum = Version(MIN_ANTIGRAVITY_VERSION)
+        status = VersionStatus.OK if detected >= minimum else VersionStatus.TOO_OLD
+        return status, ver_str
+    except Exception:
+        return VersionStatus.PARSE_ERROR, ver_str
 
 
 @contextlib.contextmanager
@@ -137,6 +163,25 @@ def do_patch_manager(path):
     hash_before = file_hash(path)
     info(f"Target: {color(path, COLOR_CYAN)}")
     hint(f"Size: {color(format_bytes(file_size(path)), COLOR_CYAN)}")
+
+    # Проверка версии Antigravity (считывается из package.json в app.asar)
+    asar_path = find_asar_relative_to_manager(path)
+    if asar_path:
+        ver_status, ver_str = check_antigravity_version(asar_path)
+        if ver_status == VersionStatus.TOO_OLD:
+            err(f"Unsupported version: {ver_str}")
+            err(f"Minimum required: {MIN_ANTIGRAVITY_VERSION}")
+            hint("Please update Antigravity and try again.")
+            if not confirmed("Proceed anyway?"):
+                return
+        elif ver_status == VersionStatus.NOT_FOUND:
+            warn("Could not detect Antigravity version (package.json not found in ASAR).")
+            if not confirmed("Proceed without version check?"):
+                return
+        elif ver_status == VersionStatus.PARSE_ERROR:
+            warn(f"Could not parse version string: {ver_str}")
+            if not confirmed("Proceed anyway?"):
+                return
     print()
 
     write_success = False

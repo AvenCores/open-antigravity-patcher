@@ -186,7 +186,7 @@ def resign_macos_bundle(main_js_path):
 
 
 def resign_macos_binary(path):
-    """Переподписывает standalone-бинарь ad-hoc подписью после его модификации.
+    """Переподписывает Antigravity 2.0 бинарь ad-hoc подписью после его модификации.
 
     На Apple Silicon macOS немедленно SIGKILL-ит процесс, если code signature
     не совпадает с содержимым. codesign --force --sign - заменяет Developer ID

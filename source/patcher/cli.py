@@ -30,20 +30,13 @@ from patcher.ide.discovery import (
     find_install_root,
     find_main_js,
     get_ag_version,
-    assign_custom_path,
-)
-from patcher.asar.discovery import (
-    find_antigravity_root,
-    resolve_antigravity_paths,
-    is_antigravity_patched,
-    read_package_json_from_asar,
+    resolve_target_path,
 )
 from patcher.ide.patcher import is_already_patched, do_patch, do_restore, do_fix_429
-from patcher.asar.patcher import do_patch_antigravity, do_restore_antigravity
 from patcher.agy.discovery import find_agy_binary, resolve_agy_path
 from patcher.agy.patcher import is_already_patched as is_agy_patched, do_patch_agy, do_restore_agy
 
-from patcher.manager.discovery import find_manager_binary, resolve_manager_path
+from patcher.manager.discovery import find_manager_binary, resolve_manager_path, get_antigravity_version
 from patcher.manager.patcher import is_already_patched as is_mgr_patched, do_patch_manager, do_restore_manager
 
 
@@ -118,42 +111,7 @@ def _kv(label, value_text, value_color):
     print(f"      {label:<9}{color(value_text, value_color)}")
 
 
-def print_antigravity_status(antigravity_root, manager_path):
-    print_menu_section("ANTIGRAVITY")
-    _kv("Target:", antigravity_root if antigravity_root else "Not found", COLOR_CYAN)
-    if antigravity_root and os.path.isdir(antigravity_root):
-        asar_path, _ = resolve_antigravity_paths(antigravity_root)
-        if os.path.exists(asar_path):
-            _kv("Status:", "found", COLOR_GREEN)
-            patched = is_antigravity_patched(asar_path)
-            _kv("Patch:", "already patched" if patched else "not patched",
-                COLOR_YELLOW if patched else COLOR_GREEN)
-
-            ver_str = read_package_json_from_asar(asar_path)
-            _kv("Version:", ver_str if ver_str else "not detected",
-                COLOR_GREEN if ver_str else COLOR_YELLOW)
-
-            size = file_size(asar_path)
-            _kv("Size:", format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)
-        else:
-            _kv("Status:", "ASAR missing", COLOR_RED)
-    else:
-        _kv("Status:", "not found", COLOR_RED)
-
-    # Manager (language_server) inside the same Antigravity block:
-    print()
-    _kv("Server:", manager_path if manager_path else "Not found", COLOR_CYAN)
-    if manager_path and os.path.isfile(manager_path):
-        m_patched = is_mgr_patched(manager_path)
-        _kv("S-Patch:", "already patched" if m_patched else "not patched",
-            COLOR_YELLOW if m_patched else COLOR_GREEN)
-        m_size = file_size(manager_path)
-        _kv("S-Size:", format_bytes(m_size), COLOR_GREEN if m_size > 0 else COLOR_YELLOW)
-    else:
-        _kv("S-Status:", "not found", COLOR_YELLOW)
-
-
-def print_target_info(main_js_path, antigravity_root="", agy_path="", manager_path="", show_search_line=False):
+def print_target_info(main_js_path, manager_path="", agy_path="", show_search_line=False):
     if show_search_line:
         info("Searching for installations...")
 
@@ -161,34 +119,45 @@ def print_target_info(main_js_path, antigravity_root="", agy_path="", manager_pa
     print_menu_section("ANTIGRAVITY IDE")
     _kv("Target:", main_js_path if main_js_path else "Not found", COLOR_CYAN)
     if main_js_path and os.path.exists(main_js_path):
-        exists = os.path.exists(main_js_path)
-        is_dir = os.path.isdir(main_js_path) if exists else False
-        if is_dir:
-            _kv("Status:", "directory (missing main.js)", COLOR_YELLOW)
-        else:
-            try:
-                with open(main_js_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                _kv("Status:", "found", COLOR_GREEN)
-                patch_text = "already patched" if is_already_patched(content) else "not patched"
-                _kv("Patch:", patch_text, COLOR_YELLOW if is_already_patched(content) else COLOR_GREEN)
-            except Exception:
-                _kv("Status:", "unreadable", COLOR_RED)
-                _kv("Patch:", "unreadable", COLOR_RED)
+        try:
+            with open(main_js_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            _kv("Status:", "found", COLOR_GREEN)
+            patched = is_already_patched(content)
+            _kv("Patch:", "already patched" if patched else "not patched",
+                COLOR_YELLOW if patched else COLOR_GREEN)
+        except Exception:
+            _kv("Status:", "unreadable", COLOR_RED)
+            _kv("Patch:", "unreadable", COLOR_RED)
 
-            ver_str, _ = get_ag_version(main_js_path)
-            _kv("Version:", ver_str if ver_str else "not detected",
-                COLOR_GREEN if ver_str else COLOR_YELLOW)
+        ver_str, _ = get_ag_version(main_js_path)
+        _kv("Version:", ver_str if ver_str else "not detected",
+            COLOR_GREEN if ver_str else COLOR_YELLOW)
 
-            size = file_size(main_js_path)
-            _kv("Size:", format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)
+        size = file_size(main_js_path)
+        _kv("Size:", format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)
     else:
         _kv("Status:", "not found", COLOR_RED)
 
     print()
 
-    # 2. Antigravity Info
-    print_antigravity_status(antigravity_root, manager_path)
+    # 2. Antigravity 2.0 Info
+    print_menu_section("ANTIGRAVITY 2.0")
+    _kv("Target:", manager_path if manager_path else "Not found", COLOR_CYAN)
+    if manager_path and os.path.isfile(manager_path):
+        _kv("Status:", "found", COLOR_GREEN)
+        patched = is_mgr_patched(manager_path)
+        _kv("Patch:", "already patched" if patched else "not patched",
+            COLOR_YELLOW if patched else COLOR_GREEN)
+        
+        ver_str = get_antigravity_version(manager_path)
+        _kv("Version:", ver_str if ver_str else "not detected",
+            COLOR_GREEN if ver_str else COLOR_YELLOW)
+
+        size = file_size(manager_path)
+        _kv("Size:", format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)
+    else:
+        _kv("Status:", "not found", COLOR_YELLOW)
 
     print()
 
@@ -206,18 +175,17 @@ def print_target_info(main_js_path, antigravity_root="", agy_path="", manager_pa
         _kv("Status:", "not found", COLOR_YELLOW)
 
 
-def redraw_main_screen(main_js_path, antigravity_root="", agy_path="", manager_path="", show_search_line=False):
+def redraw_main_screen(main_js_path, manager_path="", agy_path="", show_search_line=False):
     clear_screen()
     print_banner()
-    print_target_info(main_js_path, antigravity_root, agy_path, manager_path, show_search_line=show_search_line)
+    print_target_info(main_js_path, manager_path, agy_path, show_search_line=show_search_line)
     print()
 
 
 def run_cli():
     main_js_path = ""
-    antigravity_root = ""
-    agy_path = ""
     manager_path = ""
+    agy_path = ""
     searched = False
 
     # 1. Проверяем аргументы командной строки
@@ -225,27 +193,35 @@ def run_cli():
         args = [a for a in sys.argv[1:] if a not in ("--rollback", "-r")]
         if args:
             arg = " ".join(args)
-            main_js_path, antigravity_root = assign_custom_path(arg)
-            if not main_js_path and not antigravity_root:
-                resolved_agy = resolve_agy_path(arg)
-                if resolved_agy:
-                    agy_path = resolved_agy
+            # Пытаемся определить тип цели
+            ide_path = resolve_target_path(arg)
+            if ide_path and os.path.isdir(ide_path):
+                ide_path = find_main_js(ide_path)
+            
+            if ide_path and os.path.isfile(ide_path) and ide_path.endswith("main.js"):
+                main_js_path = ide_path
+            else:
+                # Пробуем как Antigravity 2.0 (Manager / language_server)
+                mgr_path = resolve_manager_path(arg)
+                if mgr_path and os.path.isfile(mgr_path):
+                    manager_path = mgr_path
                 else:
-                    resolved_mgr = resolve_manager_path(arg)
-                    if resolved_mgr:
-                        manager_path = resolved_mgr
+                    # Пробуем как CLI (agy)
+                    agy_p = resolve_agy_path(arg)
+                    if agy_p and os.path.isfile(agy_p):
+                        agy_path = agy_p
                     else:
                         err(f"Provided path does not exist or invalid: {arg}")
 
     # 2. Проверяем текущую директорию (для Antigravity IDE)
-    if not main_js_path and not antigravity_root and not agy_path and not manager_path:
+    if not main_js_path and not manager_path and not agy_path:
         local = os.path.join(os.getcwd(), "main.js")
         if os.path.exists(local):
             main_js_path = local
             info("Found main.js in current directory")
 
     # 3. Авто-поиск в системе
-    if not main_js_path and not antigravity_root and not agy_path and not manager_path:
+    if not main_js_path and not manager_path and not agy_path:
         info("Searching for installations...")
         searched = True
 
@@ -253,38 +229,42 @@ def run_cli():
         if ide_root:
             main_js_path = find_main_js(ide_root)
 
-        antigravity_root = find_antigravity_root()
-        agy_path = find_agy_binary()
         manager_path = find_manager_binary()
+        agy_path = find_agy_binary()
 
     # Если ничего не нашли вообще, просим ввести вручную сразу
-    if not main_js_path and not antigravity_root and not agy_path and not manager_path:
+    if not main_js_path and not manager_path and not agy_path:
         warn("No installations found automatically.")
-        hint("Please specify the path to Antigravity IDE, Antigravity, agy, language_server, or main.js.")
+        hint("Please specify the path to Antigravity IDE, Antigravity 2.0, or agy.")
         print_path_examples()
         raw = input(color("\n  Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
         if raw:
-            main_js_path, antigravity_root = assign_custom_path(raw)
-            if not main_js_path and not antigravity_root:
-                resolved_agy = resolve_agy_path(raw)
-                if resolved_agy:
-                    agy_path = resolved_agy
+            ide_path = resolve_target_path(raw)
+            if ide_path and os.path.isdir(ide_path):
+                ide_path = find_main_js(ide_path)
+            
+            if ide_path and os.path.isfile(ide_path) and ide_path.endswith("main.js"):
+                main_js_path = ide_path
+            else:
+                mgr_path = resolve_manager_path(raw)
+                if mgr_path and os.path.isfile(mgr_path):
+                    manager_path = mgr_path
                 else:
-                    resolved_mgr = resolve_manager_path(raw)
-                    if resolved_mgr:
-                        manager_path = resolved_mgr
+                    agy_p = resolve_agy_path(raw)
+                    if agy_p and os.path.isfile(agy_p):
+                        agy_path = agy_p
 
-    redraw_main_screen(main_js_path, antigravity_root, agy_path, manager_path, show_search_line=searched)
+    redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
 
     while True:
         print_menu_section("PATCH")
-        print_menu_row("1", "Antigravity IDE patch", "bypass region lock", COLOR_GREEN)
-        print_menu_row("2", "Antigravity patch", "unlock full app / sub-menu", COLOR_GREEN)
+        print_menu_row("1", "Antigravity IDE patch", "bypass region lock (isGoogleInternal)", COLOR_GREEN)
+        print_menu_row("2", "Antigravity 2.0 patch", "patch language_server binary", COLOR_GREEN)
         print_menu_row("3", "Antigravity CLI (agy) patch", "unlock agy tool", COLOR_GREEN)
 
         print_menu_section("RESTORE")
         print_menu_row("4", "Antigravity IDE", "from backup", COLOR_YELLOW)
-        print_menu_row("5", "Antigravity", "from backup / sub-menu", COLOR_YELLOW)
+        print_menu_row("5", "Antigravity 2.0", "from backup", COLOR_YELLOW)
         print_menu_row("6", "Antigravity CLI", "from backup", COLOR_YELLOW)
 
         print_menu_section("TOOLS")
@@ -304,7 +284,7 @@ def run_cli():
 
         # Пустой ввод — не выходим, просто перерисовываем меню
         if choice == "":
-            redraw_main_screen(main_js_path, antigravity_root, agy_path, manager_path, show_search_line=searched)
+            redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
             continue
 
         valid_choices = {str(i) for i in range(1, 10)}
@@ -312,7 +292,7 @@ def run_cli():
             err("Invalid choice")
             print()
             pause()
-            redraw_main_screen(main_js_path, antigravity_root, agy_path, manager_path, show_search_line=searched)
+            redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
             continue
 
         handled = True
@@ -325,52 +305,10 @@ def run_cli():
             else:
                 err("Antigravity IDE path is not set. Please select custom path (Option 9) first.")
         elif choice == "2":
-            if not antigravity_root:
-                err("Antigravity path is not set. Please select custom path (Option 9) first.")
+            if manager_path:
+                do_patch_manager(manager_path)
             else:
-                while True:
-                    clear_screen()
-                    print_banner()
-                    print_antigravity_status(antigravity_root, manager_path)
-                    print()
-                    print_menu_section("ANTIGRAVITY PATCH OPTIONS")
-                    print_menu_row("1", "Both (Recommended)", "Patch ASAR and language_server", COLOR_GREEN)
-                    print_menu_row("2", "Only ASAR (Frontend)", "Patch app.asar frontend proxy", COLOR_GREEN)
-                    print_menu_row("3", "Only language_server (Backend)", "Patch language_server binary", COLOR_GREEN)
-                    print()
-                    print_menu_row("0", "Back", "return to main menu", COLOR_RED)
-                    print_menu_footer()
-
-                    sub = input(color("\n  Select option > ", COLOR_CYAN, COLOR_BOLD)).strip()
-                    if sub == "0" or not sub:
-                        handled = False
-                        break
-
-                    if sub == "1":
-                        clear_screen()
-                        print_banner()
-                        info("Patching ASAR frontend...")
-                        do_patch_antigravity(antigravity_root)
-                        print()
-                        if manager_path:
-                            info("Patching language_server backend...")
-                            do_patch_manager(manager_path)
-                        else:
-                            warn("language_server binary path not found. Skipping backend patch.")
-                        break
-                    elif sub == "2":
-                        clear_screen()
-                        print_banner()
-                        do_patch_antigravity(antigravity_root)
-                        break
-                    elif sub == "3":
-                        clear_screen()
-                        print_banner()
-                        if manager_path:
-                            do_patch_manager(manager_path)
-                        else:
-                            err("Antigravity Manager path is not set.")
-                        break
+                err("Antigravity 2.0 (language_server) path is not set. Please select custom path (Option 9) first.")
         elif choice == "3":
             if agy_path:
                 do_patch_agy(agy_path)
@@ -382,52 +320,10 @@ def run_cli():
             else:
                 err("Antigravity IDE path is not set. Please select custom path (Option 9) first.")
         elif choice == "5":
-            if not antigravity_root:
-                err("Antigravity path is not set. Please select custom path (Option 9) first.")
+            if manager_path:
+                do_restore_manager(manager_path)
             else:
-                while True:
-                    clear_screen()
-                    print_banner()
-                    print_antigravity_status(antigravity_root, manager_path)
-                    print()
-                    print_menu_section("ANTIGRAVITY RESTORE OPTIONS")
-                    print_menu_row("1", "Both (Recommended)", "Restore ASAR and language_server", COLOR_GREEN)
-                    print_menu_row("2", "Only ASAR (Frontend)", "Restore app.asar from backup", COLOR_YELLOW)
-                    print_menu_row("3", "Only language_server (Backend)", "Restore language_server from backup", COLOR_YELLOW)
-                    print()
-                    print_menu_row("0", "Back", "return to main menu", COLOR_RED)
-                    print_menu_footer()
-
-                    sub = input(color("\n  Select option > ", COLOR_CYAN, COLOR_BOLD)).strip()
-                    if sub == "0" or not sub:
-                        handled = False
-                        break
-
-                    if sub == "1":
-                        clear_screen()
-                        print_banner()
-                        info("Restoring ASAR frontend...")
-                        do_restore_antigravity(antigravity_root)
-                        print()
-                        if manager_path:
-                            info("Restoring language_server backend...")
-                            do_restore_manager(manager_path)
-                        else:
-                            warn("language_server binary path not found. Skipping backend restore.")
-                        break
-                    elif sub == "2":
-                        clear_screen()
-                        print_banner()
-                        do_restore_antigravity(antigravity_root)
-                        break
-                    elif sub == "3":
-                        clear_screen()
-                        print_banner()
-                        if manager_path:
-                            do_restore_manager(manager_path)
-                        else:
-                            err("Antigravity Manager path is not set.")
-                        break
+                err("Antigravity 2.0 (language_server) path is not set. Please select custom path (Option 9) first.")
         elif choice == "6":
             if agy_path:
                 do_restore_agy(agy_path)
@@ -436,7 +332,7 @@ def run_cli():
         elif choice == "7":
             do_fix_429()
         elif choice == "8":
-            print_target_info(main_js_path, antigravity_root, agy_path, manager_path, show_search_line=searched)
+            print_target_info(main_js_path, manager_path, agy_path, show_search_line=searched)
             print()
             if confirmed("Open GitHub repository in browser?"):
                 url = "https://github.com/AvenCores/open-antigravity-unlock"
@@ -446,12 +342,11 @@ def run_cli():
                 cancel("Cancelled.")
         elif choice == "9":
             while True:
-                redraw_main_screen(main_js_path, antigravity_root, agy_path, manager_path, show_search_line=searched)
+                redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
                 print_menu_section("SELECT CUSTOM PATH")
                 print_menu_row("1", "Antigravity IDE path", "folder or main.js", COLOR_GREEN)
-                print_menu_row("2", "Antigravity path", "app folder", COLOR_GREEN)
+                print_menu_row("2", "Antigravity 2.0 path", "folder or language_server binary", COLOR_GREEN)
                 print_menu_row("3", "Antigravity CLI path", "agy.exe or folder", COLOR_GREEN)
-                print_menu_row("4", "Antigravity Manager path", "language_server.exe or folder", COLOR_GREEN)
                 print()
                 print_menu_row("0", "Back", "return to main menu", COLOR_RED)
                 print_menu_footer("Leaves auto-detection results intact for other targets.")
@@ -467,27 +362,32 @@ def run_cli():
                      print_path_examples()
                      raw = input(color("\n  IDE Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
                      if raw:
-                         new_main_js, _ = assign_custom_path(raw)
-                         if new_main_js:
-                             main_js_path = new_main_js
-                             searched = False
-                             ok("Antigravity IDE path updated!")
+                         new_path = resolve_target_path(raw)
+                         if new_path and os.path.exists(new_path):
+                             if os.path.isdir(new_path):
+                                 new_path = find_main_js(new_path)
+                             if new_path and os.path.isfile(new_path):
+                                 main_js_path = new_path
+                                 searched = False
+                                 ok("Antigravity IDE path updated!")
+                             else:
+                                 err("Could not resolve a valid Antigravity IDE target (main.js not found).")
                          else:
-                             err("Could not resolve a valid Antigravity IDE target.")
+                             err("Path does not exist.")
                      pause()
                 elif sub_choice == "2":
                      print()
-                     hint("Enter the path to Antigravity folder.")
+                     hint("Enter the path to Antigravity 2.0 app folder or language_server binary.")
                      print_path_examples()
-                     raw = input(color("\n  Antigravity Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
+                     raw = input(color("\n  Antigravity 2.0 Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
                      if raw:
-                         _, new_ag_root = assign_custom_path(raw)
-                         if new_ag_root:
-                             antigravity_root = new_ag_root
+                         new_path = resolve_manager_path(raw)
+                         if new_path and os.path.isfile(new_path):
+                             manager_path = new_path
                              searched = False
-                             ok("Antigravity path updated!")
+                             ok("Antigravity 2.0 path updated!")
                          else:
-                             err("Could not resolve a valid Antigravity target.")
+                             err("Could not resolve a valid Antigravity 2.0 target (language_server not found).")
                      pause()
                 elif sub_choice == "3":
                      print()
@@ -495,27 +395,13 @@ def run_cli():
                      print_path_examples()
                      raw = input(color("\n  AGY Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
                      if raw:
-                         new_agy = resolve_agy_path(raw)
-                         if new_agy:
-                             agy_path = new_agy
+                         new_path = resolve_agy_path(raw)
+                         if new_path and os.path.isfile(new_path):
+                             agy_path = new_path
                              searched = False
                              ok("Antigravity CLI path updated!")
                          else:
                              err("Could not resolve a valid Antigravity CLI target.")
-                     pause()
-                elif sub_choice == "4":
-                     print()
-                     hint("Enter the path to the language_server binary or its folder.")
-                     print_path_examples()
-                     raw = input(color("\n  Manager Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
-                     if raw:
-                         new_mgr = resolve_manager_path(raw)
-                         if new_mgr:
-                             manager_path = new_mgr
-                             searched = False
-                             ok("Antigravity Manager path updated!")
-                         else:
-                             err("Could not resolve a valid Antigravity Manager target.")
                      pause()
             handled = True
 
@@ -523,4 +409,4 @@ def run_cli():
 
         if handled:
             pause()
-        redraw_main_screen(main_js_path, antigravity_root, agy_path, manager_path, show_search_line=searched)
+        redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
