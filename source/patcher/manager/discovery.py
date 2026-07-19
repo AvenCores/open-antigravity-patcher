@@ -2,8 +2,6 @@ import os
 import sys
 import glob
 import shutil
-import struct
-import json
 
 
 def clean_path(raw_path):
@@ -158,58 +156,3 @@ def resolve_manager_path(raw_path):
             return path3
             
     return ""
-
-
-def _read_asar_header(f):
-    try:
-        f.seek(0)
-        _, header_size, _, json_size = struct.unpack('<IIII', f.read(16))
-        json_bytes = f.read(json_size)
-        header = json.loads(json_bytes.decode('utf-8'))
-        payload_offset = 8 + header_size
-        return header, payload_offset
-    except Exception:
-        return None, None
-
-
-def read_package_json_from_asar(asar_path):
-    if not os.path.exists(asar_path):
-        return None
-    try:
-        with open(asar_path, 'rb') as f:
-            header, payload_offset = _read_asar_header(f)
-            if header is None:
-                return None
-
-            files = header.get('files', {})
-            pkg_entry = files.get('package.json')
-            if pkg_entry and 'offset' in pkg_entry and 'size' in pkg_entry:
-                offset = int(pkg_entry['offset'])
-                size = pkg_entry['size']
-                f.seek(payload_offset + offset)
-                data = f.read(size)
-                pkg_data = json.loads(data.decode('utf-8'))
-                return pkg_data.get('version')
-    except Exception:
-        pass
-    return None
-
-
-def find_asar_relative_to_manager(manager_path):
-    parent = os.path.dirname(manager_path)
-    for _ in range(4):
-        if not parent or parent == os.path.dirname(parent):
-            break
-        for sub in ("resources/app.asar", "resources/app1.asar", "app.asar", "app1.asar", "Contents/Resources/app.asar", "Contents/Resources/app1.asar"):
-            p = os.path.join(parent, sub)
-            if os.path.exists(p):
-                return p
-        parent = os.path.dirname(parent)
-    return ""
-
-
-def get_antigravity_version(manager_path):
-    asar_path = find_asar_relative_to_manager(manager_path)
-    if not asar_path:
-        return None
-    return read_package_json_from_asar(asar_path)

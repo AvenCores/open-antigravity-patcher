@@ -1,11 +1,19 @@
 import os
 import sys
 import re
+import json
 import time
 import shutil
 
 from patcher.constants import (
+    AUTH_PATCH_SWITCH_VERSION,
+    RUNTIME_SETTINGS_SWITCH_VERSION,
+    CLOUD_CODE_ENDPOINT,
+    RUNTIME_EXPERIMENTS_VALUE,
     MIN_AG_VERSION,
+    RE_AUTH_IS_GOOGLE_INTERNAL,
+    RE_AUTH_IS_GOOGLE_INTERNAL_OLD,
+    RE_AUTH_IS_GOOGLE_INTERNAL_NEW,
     COLOR_CYAN,
 )
 from patcher.utils.console import (
@@ -37,47 +45,106 @@ from patcher.ide.discovery import (
     VersionStatus,
 )
 
-IDE_RE = re.compile(r"(resetIsTierGCPTos\(\),)this\.[A-Za-z_$0-9]+\.isGoogleInternal")
-IDE_DONE = "resetIsTierGCPTos(),true"
+
+RE_IF_INTERNAL = re.compile(r"if\(this\.([a-zA-Z_$]+)\.isGoogleInternal\)")
 
 
-def _ide_cache_dirs():
-    """VS Code CachedData / Code Cache dirs to drop after patching main.js, so the IDE
-    recompiles the patched bytes instead of replaying a stale compile cache. The user-data
-    folder is the product nameLong ('Antigravity IDE') under each OS's app-data root."""
-    home = os.path.expanduser("~")
-    if os.name == "nt":
-        bases = [os.path.expandvars(p) for p in
-                 (r"%USERPROFILE%\scoop\persist\antigravity-ide\data\user-data",
-                  r"%APPDATA%\Antigravity IDE")]
-    elif sys.platform == "darwin":
-        bases = [os.path.join(home, "Library", "Application Support", "Antigravity IDE")]
-    else:                                                  # Linux (respect XDG_CONFIG_HOME)
-        cfg = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
-        bases = [os.path.join(cfg, "Antigravity IDE")]
-    dirs = []
-    for base in bases:
-        dirs += [os.path.join(base, "CachedData"),
-                 os.path.join(base, "Code Cache", "js")]
-    return dirs
-
-
-def apply_patches(content, ag_version=None):
-    """Применяет патч isGoogleInternal для IDE из manager.py."""
-    results = []
-    matches = [m.group(0) for m in IDE_RE.finditer(content)]
-    new_content = IDE_RE.sub(r"\1true", content)
+def _patch_is_google_internal(content):
+    """if(isGoogleInternal) → if(true) — forces internal Google path bypassing geo/eligibility checks."""
+    matches = [m.group(0) for m in RE_IF_INTERNAL.finditer(content)]
+    new_content = RE_IF_INTERNAL.sub("if(true)", content)
     applied = new_content != content
-    results.append({
-        "Name": "isGoogleInternal -> true (auth)",
+    detail = f"replaced {len(matches)} occurrences: {list(set(matches))}" if applied else ""
+    return new_content, {
+        "Name": "if(isGoogleInternal) → if(true)",
         "Applied": applied,
-        "Detail": f"replaced {len(matches)} occurrences" if applied else "pattern not found",
-    })
-    return new_content, results
+        "Detail": detail,
+    }
+
+
+def _patch_is_google_internal_comma(content, ag_version=None):
+    """if(...resetIsTierGCPTos(),this.Y.isGoogleInternal) → if(...resetIsTierGCPTos(),true).
+
+    Версионный выбор auth-паттерна:
+    < 1.23:
+    if(this.w.resetIsTierGCPTos(),this.t.isGoogleInternal){...}
+
+    >= 1.23:
+    if(this.t.send({type:t.isGcpTos?"GCP_SIGN_IN":"SIGN_IN"}),this.y.resetIsTierGCPTos(),this.w.isGoogleInternal){...}
+    """
+    if ag_version is not None and ag_version < AUTH_PATCH_SWITCH_VERSION:
+        auth_regex = RE_AUTH_IS_GOOGLE_INTERNAL_OLD
+        pattern_label = f"< {AUTH_PATCH_SWITCH_VERSION}"
+    elif ag_version is not None:
+        auth_regex = RE_AUTH_IS_GOOGLE_INTERNAL_NEW
+        pattern_label = f">= {AUTH_PATCH_SWITCH_VERSION}"
+    else:
+        auth_regex = RE_AUTH_IS_GOOGLE_INTERNAL
+        pattern_label = "auto"
+
+    matches = [m.group(0) for m in auth_regex.finditer(content)]
+    new_content = auth_regex.sub(r"if(\g<prefix>true)", content)
+    applied = new_content != content
+    return new_content, {
+        "Name": "comma isGoogleInternal → true (auth)",
+        "Applied": applied,
+        "Detail": (
+            f"replaced {len(matches)} auth occurrence(s) using {pattern_label} pattern"
+            if applied else
+            f"{pattern_label} pattern not found"
+        ),
+    }
+
+
+def _patch_ide_name(content):
+    """ideName → antigravity-insiders"""
+    new_content = content.replace('ideName:"antigravity"', 'ideName:"antigravity-insiders"')
+    return new_content, {
+        "Name": "ideName → antigravity-insiders",
+        "Applied": new_content != content,
+        "Detail": "",
+    }
+
+
+def _patch_ineligible_screen(content):
+    """Патч экрана ineligible (screen 4) в v1.22+.
+
+    Заменяет spread тернар ...s?{}:{errorType:"ineligible",...}
+    на ...s?{}:{} — ineligible ошибка не отправляется.
+    """
+    old = '...s?{}:{errorType:"ineligible",reason:a,verificationUrl:i}'
+    new = '...s?{}:{}'
+    if old in content:
+        content = content.replace(old, new)
+        return content, {
+            "Name": "ineligible screen bypass (v1.22+)",
+            "Applied": True,
+            "Detail": "Replaced ineligible spread with empty object",
+        }
+
+    return content, {
+        "Name": "ineligible screen bypass",
+        "Applied": False,
+        "Detail": "pattern not found",
+    }
+
+
+def apply_patches_minimal(content, ag_version=None):
+    """Для v1.22+: version-aware auth patch + ideName + ineligible."""
+    results = []
+    for patch_fn in (_patch_ide_name, _patch_ineligible_screen):
+        content, result = patch_fn(content)
+        results.append(result)
+    content, result = _patch_is_google_internal_comma(content, ag_version=ag_version)
+    results.insert(0, result)
+    return content, results
 
 
 def is_already_patched(content):
-    return IDE_DONE in content and not IDE_RE.search(content)
+    # Убран auth-вариант isGoogleInternal, ideName пропатчен
+    has_unpatched_auth = bool(RE_AUTH_IS_GOOGLE_INTERNAL.search(content))
+    has_ide = 'ideName:"antigravity-insiders"' in content
+    return not has_unpatched_auth and has_ide
 
 
 def get_user_settings_path():
@@ -115,6 +182,109 @@ def get_user_data_dir():
         return ""
     # settings.json is in <data_dir>/User/settings.json
     return os.path.dirname(os.path.dirname(path))
+
+
+def patch_runtime_settings(ag_version=None):
+    """Temporary workaround: pins the stable endpoint and disables known bad experiments."""
+    if ag_version is not None and ag_version < RUNTIME_SETTINGS_SWITCH_VERSION:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": f"skipped for Antigravity IDE < {RUNTIME_SETTINGS_SWITCH_VERSION}",
+        }
+
+    settings_path = get_user_settings_path()
+    if not settings_path:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": "settings path not detected",
+        }
+
+    settings_dir = os.path.dirname(settings_path)
+    data_dir = os.path.dirname(settings_dir)
+    if not os.path.isdir(settings_dir):
+        try:
+            os.makedirs(settings_dir, exist_ok=True)
+            # Fix permissions on POSIX if we just created the dir as root
+            fix_posix_permissions(data_dir)
+        except Exception as e:
+            return {
+                "Name": "temporary runtime settings workaround",
+                "Applied": False,
+                "Detail": f"could not create settings directory: {e}",
+            }
+
+    settings = {}
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                raw = f.read()
+            settings = json.loads(raw) if raw.strip() else {}
+        except Exception as e:
+            return {
+                "Name": "temporary runtime settings workaround",
+                "Applied": False,
+                "Detail": f"settings.json parse error: {e}",
+            }
+
+        if not isinstance(settings, dict):
+            return {
+                "Name": "temporary runtime settings workaround",
+                "Applied": False,
+                "Detail": "settings.json root is not an object",
+            }
+
+    before = json.dumps(settings, sort_keys=True, ensure_ascii=False)
+
+    settings["jetski.cloudCodeUrl"] = CLOUD_CODE_ENDPOINT
+    settings["codeiumDev.forceDisableExperiments"] = RUNTIME_EXPERIMENTS_VALUE
+
+    env = settings.get("codeiumDev.languageServerEnv", {})
+    if not isinstance(env, dict):
+        env = {}
+    env["BORG_DISABLE_EXPERIMENTS"] = RUNTIME_EXPERIMENTS_VALUE
+    env["BORG_EXPERIMENTS"] = ""
+    settings["codeiumDev.languageServerEnv"] = env
+
+    after = json.dumps(settings, sort_keys=True, ensure_ascii=False)
+    if after == before:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": "already present",
+        }
+
+    backup_path = ""
+    try:
+        backup_path = backup_json_file(settings_path)
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=4, ensure_ascii=False)
+            f.write("\n")
+        fix_posix_permissions(settings_path)
+    except Exception as e:
+        return {
+            "Name": "temporary runtime settings workaround",
+            "Applied": False,
+            "Detail": f"write error: {e}",
+        }
+
+    detail = f"updated {settings_path}"
+    if backup_path:
+        detail += f"; backup: {os.path.basename(backup_path)}"
+    return {
+        "Name": "temporary runtime settings workaround",
+        "Applied": True,
+        "Detail": detail,
+    }
+
+
+def print_runtime_settings_result(result):
+    applied = result.get("Applied", False)
+    detail = result.get("Detail", "")
+    if not applied and detail.startswith("skipped"):
+        applied = None
+    step(result["Name"], applied, detail)
 
 
 def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_content=None):
@@ -195,11 +365,12 @@ def do_patch(main_js_path, show_search_line=False):
         if not confirm_with_captcha("Apply main.js patches anyway?"):
             return
 
-    # --- БЭКАП ---
+    # --- БЭКАП — копируем файл ДО любых изменений ---
     backup_path = main_js_path + ".bak"
 
     if not os.path.exists(backup_path) and not current_is_patched:
         info("Creating backup...")
+        # На macOS снимаем immutable-флаги перед записью в .app-бандл
         if sys.platform == "darwin":
             app_path = find_app_bundle(main_js_path)
             if app_path:
@@ -211,6 +382,7 @@ def do_patch(main_js_path, show_search_line=False):
             ok(f"Backup: {os.path.basename(backup_path)} "
                f"({format_bytes(file_size(backup_path))})")
         except PermissionError as e:
+            # На macOS повторяем попытку после снятия флагов
             if sys.platform == "darwin":
                 warn(f"Permission denied, retrying after removing flags...")
                 app_path = find_app_bundle(main_js_path)
@@ -241,7 +413,8 @@ def do_patch(main_js_path, show_search_line=False):
     info("Applying patches...")
     print()
 
-    new_content, results = apply_patches(content, ag_version=parsed_version)
+    # Для v1.22+ auth-патч выбирается по версии: <1.23 старый, >=1.23 новый.
+    new_content, results = apply_patches_minimal(content, ag_version=parsed_version)
 
     applied = 0
     for r in results:
@@ -264,6 +437,7 @@ def do_patch(main_js_path, show_search_line=False):
             break
         except PermissionError as e:
             if attempt == 0:
+                # На macOS снимаем immutable-флаги перед повторной попыткой
                 if sys.platform == "darwin":
                     warn(f"Permission denied, retrying after removing flags...")
                     app_path = find_app_bundle(main_js_path)
@@ -286,17 +460,10 @@ def do_patch(main_js_path, show_search_line=False):
     if not write_success:
         return
 
-    # Очистка кэша скомпилированных JS файлов VS Code (CachedData / Code Cache)
-    info("Clearing IDE compile caches...")
-    for c in _ide_cache_dirs():
-        try:
-            if os.path.isdir(c):
-                shutil.rmtree(c, ignore_errors=True)
-        except Exception:
-            pass
-
     hash_after = file_hash(main_js_path)
     resign_macos_bundle(main_js_path)
+    info("Applying runtime settings workaround...")
+    print_runtime_settings_result(patch_runtime_settings(parsed_version))
 
     panel_rows = [
         ("Target", os.path.basename(main_js_path)),
@@ -431,6 +598,7 @@ def do_restore(main_js_path, show_search_line=False):
 
     backup_path = main_js_path + ".bak"
 
+    # Разделяем "не найден" и "нечитаем"
     if not os.path.exists(backup_path):
         err(f"Backup file not found: {backup_path}")
         return
@@ -441,6 +609,7 @@ def do_restore(main_js_path, show_search_line=False):
         err(f"Could not read backup: {e}")
         return
 
+    # Проверка размера бэкапа
     backup_size = file_size(backup_path)
     if backup_size <= 2048:
         err("Backup looks too small — may be corrupted!")
@@ -448,6 +617,7 @@ def do_restore(main_js_path, show_search_line=False):
             hint("Restore cancelled.")
             return
 
+    # Предупреждение, если бэкап сам является пропатченной версией
     if is_already_patched(data):
         warn("Backup itself appears to be patched!")
         if not confirmed("Restore this patched backup?"):
@@ -461,8 +631,10 @@ def do_restore(main_js_path, show_search_line=False):
 
     hash_before = file_hash(main_js_path)
 
+    # Атомарная запись через временный файл
     tmp_path = main_js_path + ".tmp"
     try:
+        # На macOS снимаем immutable-флаги перед записью в .app-бандл
         if sys.platform == "darwin":
             app_path = find_app_bundle(main_js_path)
             if app_path:
@@ -473,6 +645,7 @@ def do_restore(main_js_path, show_search_line=False):
         os.replace(tmp_path, main_js_path)
         fix_posix_permissions(main_js_path)
     except Exception as e:
+        # На macOS повторяем попытку после снятия флагов
         if sys.platform == "darwin":
             warn(f"Restore failed, retrying after removing flags...")
             app_path = find_app_bundle(main_js_path)
@@ -481,8 +654,8 @@ def do_restore(main_js_path, show_search_line=False):
                 remove_macos_quarantine(app_path)
             try:
                 if not os.path.exists(tmp_path):
-                     with open(tmp_path, "w", encoding="utf-8") as f:
-                         f.write(data)
+                    with open(tmp_path, "w", encoding="utf-8") as f:
+                        f.write(data)
                 os.replace(tmp_path, main_js_path)
                 fix_posix_permissions(main_js_path)
             except Exception as e2:
@@ -505,6 +678,9 @@ def do_restore(main_js_path, show_search_line=False):
     hash_after = file_hash(main_js_path)
     resign_macos_bundle(main_js_path)
 
+    from patcher.cli import print_target_info
+    print_target_info(main_js_path, show_search_line=show_search_line)
+    print()
     panel_rows = [("Target", os.path.basename(main_js_path))]
     if hash_before and hash_after and hash_before != hash_after:
         panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
