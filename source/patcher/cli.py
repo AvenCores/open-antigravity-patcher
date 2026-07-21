@@ -25,6 +25,7 @@ from patcher.utils.console import (
     cancel,
 )
 from patcher.utils.file import file_size, format_bytes
+from patcher.utils.update import check_for_updates, open_releases_page
 
 from patcher.ide.discovery import (
     find_install_root,
@@ -32,7 +33,7 @@ from patcher.ide.discovery import (
     get_ag_version,
     resolve_target_path,
 )
-from patcher.ide.patcher import is_already_patched, do_patch, do_restore, do_fix_429
+from patcher.ide.patcher import is_already_patched, do_patch, do_restore
 from patcher.agy.discovery import find_agy_binary, resolve_agy_path
 from patcher.agy.patcher import is_already_patched as is_agy_patched, do_patch_agy, do_restore_agy
 
@@ -256,6 +257,9 @@ def run_cli():
 
     redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
 
+    # Auto-check for updates on startup
+    check_for_updates(silent=True)
+
     while True:
         print_menu_section("PATCH")
         print_menu_row("1", "Antigravity IDE patch", "bypass region lock (isGoogleInternal)", COLOR_GREEN)
@@ -268,7 +272,7 @@ def run_cli():
         print_menu_row("6", "Antigravity CLI", "from backup", COLOR_YELLOW)
 
         print_menu_section("TOOLS")
-        print_menu_row("7", "Fix HTTP 429", "rate-limit / too many requests", COLOR_CYAN)
+        print_menu_row("7", "Check for updates", "check GitHub releases", COLOR_CYAN)
         print_menu_row("8", "Open GitHub repository", "source & updates", COLOR_CYAN)
         print_menu_row("9", "Select custom path", "override auto-detected target", COLOR_CYAN)
 
@@ -330,7 +334,7 @@ def run_cli():
             else:
                 err("Antigravity CLI path is not set. Please select custom path (Option 9) first.")
         elif choice == "7":
-            do_fix_429()
+            check_for_updates(silent=False)
         elif choice == "8":
             print_target_info(main_js_path, manager_path, agy_path, show_search_line=searched)
             print()

@@ -6,10 +6,8 @@ import shutil
 
 from patcher.constants import (
     MIN_AG_VERSION,
-    COLOR_CYAN,
 )
 from patcher.utils.console import (
-    color,
     info,
     hint,
     ok,
@@ -24,8 +22,6 @@ from patcher.utils.file import (
     file_size,
     format_bytes,
     fix_posix_permissions,
-    backup_json_file,
-    get_posix_invoking_user_home,
     resign_macos_bundle,
     remove_macos_immutable_flags,
     remove_macos_quarantine,
@@ -78,43 +74,6 @@ def apply_patches(content, ag_version=None):
 
 def is_already_patched(content):
     return IDE_DONE in content and not IDE_RE.search(content)
-
-
-def get_user_settings_path():
-    """Returns the Antigravity IDE user settings.json path for the current OS/user."""
-    if os.name == "nt":
-        app_data = os.environ.get("APPDATA")
-        if app_data:
-            return os.path.join(app_data, "Antigravity IDE", "User", "settings.json")
-        return ""
-
-    if sys.platform == "darwin":
-        return os.path.join(
-            get_posix_invoking_user_home(),
-            "Library",
-            "Application Support",
-            "Antigravity IDE",
-            "User",
-            "settings.json",
-        )
-
-    if os.name == "posix":
-        if os.environ.get("SUDO_USER") or os.environ.get("SUDO_UID"):
-            config_home = os.path.join(get_posix_invoking_user_home(), ".config")
-        else:
-            config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-        return os.path.join(config_home, "Antigravity IDE", "User", "settings.json")
-
-    return ""
-
-
-def get_user_data_dir():
-    """Returns the Antigravity IDE user data directory."""
-    path = get_user_settings_path()
-    if not path:
-        return ""
-    # settings.json is in <data_dir>/User/settings.json
-    return os.path.dirname(os.path.dirname(path))
 
 
 def warn_about_unsafe_backup(main_js_path, installed_version_str=None, current_content=None):
@@ -312,105 +271,6 @@ def do_patch(main_js_path, show_search_line=False):
     panel_rows.append(("Done", time.strftime('%H:%M:%S')))
     print_panel("PATCH COMPLETE", panel_rows)
     hint("Restart Antigravity IDE and sign in.")
-
-
-def do_fix_429():
-    from patcher.cli import confirmed
-
-    data_dir = get_user_data_dir()
-    if not data_dir or not os.path.isdir(data_dir):
-        err("Antigravity IDE data directory not found.")
-        return
-
-    info(f"Data directory: {color(data_dir, COLOR_CYAN)}")
-    warn("This will reset your Antigravity IDE configuration (tokens, quota).")
-    warn("Dialogues will be preserved, but you will need to sign in again.")
-    err("Ensure Antigravity IDE is COMPLETELY closed before proceeding.")
-
-    if not confirmed("Proceed with the fix?"):
-        return
-    print()
-
-    # Create backup name
-    backup_base = data_dir + "_backup_" + time.strftime("%Y%m%d_%H%M%S")
-    backup_dir = backup_base
-    counter = 1
-    while os.path.exists(backup_dir):
-        backup_dir = f"{backup_base}_{counter}"
-        counter += 1
-
-    info(f"Moving current data to: {os.path.basename(backup_dir)}...")
-
-    move_success = False
-    for attempt in range(2):
-        try:
-            shutil.move(data_dir, backup_dir)
-            move_success = True
-            break
-        except PermissionError as e:
-            if attempt == 0:
-                warn(f"Permission denied (files locked): {e}")
-                if confirmed("Would you like to automatically close running Antigravity processes and retry?"):
-                    terminate_processes(["Antigravity", "Antigravity IDE", "antigravity", "antigravity-ide"])
-                    time.sleep(1.5)
-                    continue
-            err("Permission denied: Could not move data directory.")
-            err("Antigravity IDE is likely still running or holding files.")
-            hint("Close Antigravity IDE completely (check Task Manager) and try again.")
-            return
-        except Exception as e:
-            err(f"Failed to move data directory: {e}")
-            hint("Try running the patcher as administrator.")
-            return
-
-    if not move_success:
-        return
-
-    ok("Data moved to backup")
-    info("Creating fresh configuration...")
-
-    try:
-        # Recreate the data directory and User subfolder
-        user_dir = os.path.join(data_dir, "User")
-        os.makedirs(user_dir, exist_ok=True)
-
-        # Restore storage folders (dialogues)
-        storage_folders = ["globalStorage", "workspaceStorage"]
-        restored_count = 0
-        for folder in storage_folders:
-            src = os.path.join(backup_dir, "User", folder)
-            dst = os.path.join(user_dir, folder)
-            if os.path.isdir(src):
-                info(f"Restoring {folder}...")
-                try:
-                    shutil.copytree(src, dst)
-                    restored_count += 1
-                except Exception as e:
-                    warn(f"Could not restore {folder}: {e}")
-
-        if restored_count > 0:
-            ok(f"Restored {restored_count} storage folder(s)")
-        else:
-            hint("No storage folders were restored")
-
-        # Fix permissions on POSIX if running as root
-        fix_posix_permissions(data_dir)
-
-        print_panel("HTTP 429 FIX APPLIED", [
-            ("Backup", os.path.basename(backup_dir)),
-            ("Folders", f"{restored_count} restored"),
-        ])
-        hint("What to do now:")
-        print("      1. Start Antigravity IDE.")
-        print("      2. Sign in to your account.")
-        print("      3. If you still see errors, run 'Apply patch' (Option 1) again.")
-        warn("Note: VPNs or other bypass methods might be detected by Google and cause 429 errors.")
-        hint(f"Your backup is safe at: {backup_dir}")
-
-    except Exception as e:
-        err(f"Error during restoration: {e}")
-        warn(f"Your backup is preserved at: {backup_dir}")
-        hint("You can try to restore it manually if needed.")
 
 
 def do_restore(main_js_path, show_search_line=False):
