@@ -394,7 +394,7 @@ xcode-select --install
   - **Windows** — полная поддержка автопоиска через реестр и UAC.
   - **Linux** — автопоиск в `/usr/share/antigravity-ide`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
   - **macOS** — автопоиск в `/Applications/Antigravity IDE.app` и `~/Applications/Antigravity IDE.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
-- **Минимальная версия Antigravity 2.0**: `2.3.0`
+- **Минимальная версия Antigravity 2.0**: `2.3.1`
 - **Минимальная версия Antigravity IDE**: `2.1.1`
 - **Поддерживаемые версии**: `2.3.0` и выше для Antigravity 2.0, `2.1.1` и выше для IDE
 
