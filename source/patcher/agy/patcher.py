@@ -68,12 +68,12 @@ CLI_GATE = Gate(
 )
 
 # ARM64 (Apple Silicon): handleAuthResult проверяет AuthResult.hasValidAuth (байт +8):
-# cbnz x1 ; cbz x0 ; ldrb w3,[x0,#8] ; tbnz w3,#0.
-# Патч: заменяем ldrb на mov w3,#1 → биты w3 всегда 1 → tbnz всегда переходит на success.
+# cbnz x1 ; cbz x0 ; ldrb w8,[x0,#8] ; tbnz w8,#0.
+# Патч: заменяем ldrb на mov w8,#1 → биты w8 всегда 1 → tbnz всегда переходит на success.
 ARM64_CLI_GATE = Gate(
-    rb"\xe1.\x00\xb5\x80.\x00\xb4\x03\x20\x40\x39\x43.\x00\x37",
-    rb"\xe1.\x00\xb5\x80.\x00\xb4\x23\x00\x80\x52\x43.\x00\x37",
-    b"\x23\x00\x80\x52",
+    rb".{3}\xb5.{3}\xb4\x08\x20\x40\x39.{3}\x37",
+    rb".{3}\xb5.{3}\xb4\x28\x00\x80\x52.{3}\x37",
+    b"\x28\x00\x80\x52",
     offset=8,
     desc="eligibility screen off (arm64)",
 )

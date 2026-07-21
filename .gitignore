@@ -21,3 +21,5 @@ dist/
 # AI agents
 .kimchi/
 .mimocode/
+
+antigravity
