@@ -29,7 +29,7 @@
 
 Опенсорс патчер для Antigravity 2.0, Antigravity IDE и Antigravity CLI: снимает регионные ограничения без VPN и смены региона аккаунта Google. Опенсурс аналог утилиты [Antigravity IDE в России без VPN и смены региона аккаунта Google](https://github.com/confeden/Antigravity).
 
-![maxresdefault](https://i.ibb.co/TD2spJ5r/chrome-0y4-SDd-RSiq.png)
+![maxresdefault](https://i.ibb.co/DPWgQPVQ/chrome-9-Uppenlpg7.png)
 
 # 🎦 Видео гайд по установке и решению проблем
 
