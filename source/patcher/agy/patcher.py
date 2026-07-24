@@ -206,9 +206,9 @@ def do_patch_agy(path):
     from patcher.cli import confirmed
     from patcher.utils.captcha import confirm_with_captcha
 
-    if not os.path.isfile(path):
-        err(f"Target is not a file: {path}")
-        hint("Please select a valid agy/agy.exe binary.")
+    if not path or not os.path.isfile(path):
+        from patcher.cli import offer_download_and_block
+        offer_download_and_block("Antigravity CLI")
         return
 
     hash_before = file_hash(path)

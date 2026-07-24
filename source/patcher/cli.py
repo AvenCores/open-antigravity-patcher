@@ -9,6 +9,7 @@ from patcher.constants import (
     COLOR_YELLOW,
     COLOR_RED,
     COLOR_BOLD,
+    DOWNLOAD_URL,
 )
 from patcher.utils.console import (
     color,
@@ -105,6 +106,63 @@ def prompt_yn(question):
 def confirmed(question):
     """Возвращает True, если пользователь ответил 'y'."""
     return prompt_yn(question) in ("y", "yes", "\u0434", "\u0434\u0430")
+
+
+def offer_download_and_block(software_name="Antigravity", target_type=None):
+    err(f"{software_name} path is not set or software is not installed.")
+    err("Patching attempt blocked.")
+    hint(f"Download URL: {color(DOWNLOAD_URL, COLOR_CYAN)}")
+    print()
+    print_menu_row("1", "Open download page in browser", DOWNLOAD_URL, COLOR_GREEN)
+    print_menu_row("2", f"Specify path to installed {software_name}", "manual path selection", COLOR_CYAN)
+    print_menu_row("0", "Return to main menu", "", COLOR_RED)
+    print()
+
+    action = input(color("  Select option > ", COLOR_CYAN, COLOR_BOLD)).strip()
+    if action == "1":
+        webbrowser.open(DOWNLOAD_URL)
+        ok(f"Opening: {color(DOWNLOAD_URL, COLOR_CYAN)}")
+        return None
+    elif action == "2":
+        print()
+        hint(f"Enter the path to {software_name}.")
+        print_path_examples()
+        raw = input(color(f"\n  {software_name} Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
+        if raw:
+            if target_type == "ide" or software_name == "Antigravity IDE":
+                new_path = resolve_target_path(raw)
+                if new_path and os.path.isdir(new_path):
+                    new_path = find_main_js(new_path)
+                if new_path and os.path.isfile(new_path) and new_path.endswith("main.js"):
+                    ok(f"{software_name} path updated!")
+                    return new_path
+                else:
+                    err(f"Could not resolve a valid {software_name} target (main.js not found).")
+            elif target_type == "manager" or software_name == "Antigravity 2.0":
+                new_path = resolve_manager_path(raw)
+                if new_path and os.path.isfile(new_path):
+                    ok(f"{software_name} path updated!")
+                    return new_path
+                else:
+                    err(f"Could not resolve a valid {software_name} target (language_server not found).")
+            elif target_type == "agy" or software_name == "Antigravity CLI":
+                new_path = resolve_agy_path(raw)
+                if new_path and os.path.isfile(new_path):
+                    ok(f"{software_name} path updated!")
+                    return new_path
+                else:
+                    err(f"Could not resolve a valid {software_name} target.")
+            else:
+                p = resolve_target_path(raw) or resolve_manager_path(raw) or resolve_agy_path(raw)
+                if p and os.path.exists(p):
+                    ok("Path updated!")
+                    return p
+                else:
+                    err("Invalid path provided.")
+        return None
+    else:
+        cancel("Cancelled.")
+        return None
 
 
 def _kv(label, value_text, value_color):
@@ -233,27 +291,41 @@ def run_cli():
         manager_path = find_manager_binary()
         agy_path = find_agy_binary()
 
-    # Если ничего не нашли вообще, просим ввести вручную сразу
+    # Если ничего не нашли вообще, даем выбор между открытием страницы загрузки и вводом пути
     if not main_js_path and not manager_path and not agy_path:
         warn("No installations found automatically.")
-        hint("Please specify the path to Antigravity IDE, Antigravity 2.0, or agy.")
-        print_path_examples()
-        raw = input(color("\n  Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
-        if raw:
-            ide_path = resolve_target_path(raw)
-            if ide_path and os.path.isdir(ide_path):
-                ide_path = find_main_js(ide_path)
-            
-            if ide_path and os.path.isfile(ide_path) and ide_path.endswith("main.js"):
-                main_js_path = ide_path
-            else:
-                mgr_path = resolve_manager_path(raw)
-                if mgr_path and os.path.isfile(mgr_path):
-                    manager_path = mgr_path
+        hint(f"Download URL: {color(DOWNLOAD_URL, COLOR_CYAN)}")
+        print()
+        print_menu_row("1", "Open download page in browser", DOWNLOAD_URL, COLOR_GREEN)
+        print_menu_row("2", "Specify path to installed software", "manual path selection", COLOR_CYAN)
+        print_menu_row("0", "Skip for now (go to main menu)", "", COLOR_YELLOW)
+        print()
+
+        act = input(color("  Select option > ", COLOR_CYAN, COLOR_BOLD)).strip()
+        if act == "1":
+            webbrowser.open(DOWNLOAD_URL)
+            ok(f"Opening: {color(DOWNLOAD_URL, COLOR_CYAN)}")
+            print()
+        elif act == "2":
+            print()
+            hint("Please specify the path to Antigravity IDE, Antigravity 2.0, or agy.")
+            print_path_examples()
+            raw = input(color("\n  Path > ", COLOR_CYAN, COLOR_BOLD)).strip()
+            if raw:
+                ide_path = resolve_target_path(raw)
+                if ide_path and os.path.isdir(ide_path):
+                    ide_path = find_main_js(ide_path)
+                
+                if ide_path and os.path.isfile(ide_path) and ide_path.endswith("main.js"):
+                    main_js_path = ide_path
                 else:
-                    agy_p = resolve_agy_path(raw)
-                    if agy_p and os.path.isfile(agy_p):
-                        agy_path = agy_p
+                    mgr_path = resolve_manager_path(raw)
+                    if mgr_path and os.path.isfile(mgr_path):
+                        manager_path = mgr_path
+                    else:
+                        agy_p = resolve_agy_path(raw)
+                        if agy_p and os.path.isfile(agy_p):
+                            agy_path = agy_p
 
     redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
 
@@ -304,20 +376,32 @@ def run_cli():
         print_banner()
 
         if choice == "1":
-            if main_js_path:
+            if main_js_path and os.path.isfile(main_js_path):
                 do_patch(main_js_path, show_search_line=searched)
             else:
-                err("Antigravity IDE path is not set. Please select custom path (Option 9) first.")
+                new_p = offer_download_and_block("Antigravity IDE", target_type="ide")
+                if new_p:
+                    main_js_path = new_p
+                    searched = False
+                    do_patch(main_js_path, show_search_line=searched)
         elif choice == "2":
-            if manager_path:
+            if manager_path and os.path.isfile(manager_path):
                 do_patch_manager(manager_path)
             else:
-                err("Antigravity 2.0 (language_server) path is not set. Please select custom path (Option 9) first.")
+                new_p = offer_download_and_block("Antigravity 2.0", target_type="manager")
+                if new_p:
+                    manager_path = new_p
+                    searched = False
+                    do_patch_manager(manager_path)
         elif choice == "3":
-            if agy_path:
+            if agy_path and os.path.isfile(agy_path):
                 do_patch_agy(agy_path)
             else:
-                err("Antigravity CLI path is not set. Please select custom path (Option 9) first.")
+                new_p = offer_download_and_block("Antigravity CLI", target_type="agy")
+                if new_p:
+                    agy_path = new_p
+                    searched = False
+                    do_patch_agy(agy_path)
         elif choice == "4":
             if main_js_path:
                 do_restore(main_js_path, show_search_line=searched)

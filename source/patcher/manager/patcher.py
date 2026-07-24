@@ -155,9 +155,9 @@ def do_patch_manager(path):
     from patcher.cli import confirmed
     from patcher.utils.captcha import confirm_with_captcha
 
-    if not os.path.isfile(path):
-        err(f"Target is not a file: {path}")
-        hint("Please select a valid language_server binary.")
+    if not path or not os.path.isfile(path):
+        from patcher.cli import offer_download_and_block
+        offer_download_and_block("Antigravity 2.0")
         return
 
     hash_before = file_hash(path)

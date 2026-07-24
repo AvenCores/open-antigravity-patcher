@@ -116,9 +116,9 @@ def do_patch(main_js_path, show_search_line=False):
     from patcher.cli import confirmed
     from patcher.utils.captcha import confirm_with_captcha
 
-    if not os.path.isfile(main_js_path):
-        err(f"Target is not a file: {main_js_path}")
-        hint("Please select a valid main.js file or Antigravity IDE folder.")
+    if not main_js_path or not os.path.isfile(main_js_path):
+        from patcher.cli import offer_download_and_block
+        offer_download_and_block("Antigravity IDE")
         return
 
     ver_status, ver_str = check_ag_version(main_js_path)

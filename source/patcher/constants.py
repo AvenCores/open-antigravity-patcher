@@ -1,6 +1,8 @@
 VERSION = "1.2.7"
 MIN_AG_VERSION = "2.1.1"
 MIN_ANTIGRAVITY_VERSION = "2.3.1"
+DOWNLOAD_URL = "https://antigravity.google/download"
+
 
 # Единственное место, где хранится GUID установщика Antigravity IDE
 AG_REGISTRY_SUBKEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{AA73B3E3-C6C8-45C8-B1DC-4AE56C751432}_is1"
