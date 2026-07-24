@@ -26,6 +26,7 @@ from patcher.utils.file import (
     resign_macos_bundle,
     resign_macos_binary,
 )
+from patcher.utils.update import handle_patch_failure
 from patcher.utils.admin import terminate_processes
 
 BAK_EXT = ".agybak"
@@ -211,6 +212,7 @@ def do_patch_manager(path):
                         continue
                 if not matched_gate:
                     err("gate signature not found (unsupported version?)")
+                    handle_patch_failure()
                     return
                 if kind == "patched":
                     hint("Antigravity Manager already patched.")
@@ -239,12 +241,15 @@ def do_patch_manager(path):
                     time.sleep(1.5)
                     continue
             err(f"Write error (Permission denied): {e}")
+            handle_patch_failure()
             return
         except Exception as e:
             err(f"Write error: {e}")
+            handle_patch_failure()
             return
 
     if not write_success:
+        handle_patch_failure()
         return
 
     hash_after = file_hash(path)

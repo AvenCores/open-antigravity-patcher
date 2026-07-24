@@ -16,6 +16,7 @@ from patcher.utils.console import (
     step,
     print_panel,
 )
+from patcher.utils.update import handle_patch_failure
 from patcher.utils.admin import terminate_processes
 from patcher.utils.file import (
     file_hash,
@@ -211,6 +212,7 @@ def do_patch(main_js_path, show_search_line=False):
 
     if applied == 0:
         err("No patches applied.")
+        handle_patch_failure()
         return
 
     write_success = False
@@ -237,12 +239,15 @@ def do_patch(main_js_path, show_search_line=False):
                     time.sleep(1.5)
                     continue
             err(f"Write error (Permission denied): {e}")
+            handle_patch_failure()
             return
         except Exception as e:
             err(f"Write error: {e}")
+            handle_patch_failure()
             return
 
     if not write_success:
+        handle_patch_failure()
         return
 
     # Очистка кэша скомпилированных JS файлов VS Code (CachedData / Code Cache)

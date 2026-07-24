@@ -10,6 +10,7 @@ from patcher.utils.console import color, info, ok, warn, err, hint, _frame_borde
 
 GITHUB_REPO = "AvenCores/open-antigravity-patcher"
 RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+ISSUES_URL = f"https://github.com/{GITHUB_REPO}/issues"
 API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 LAST_UPDATE_RESULT = None
@@ -116,3 +117,40 @@ def open_releases_page():
     """Open the GitHub releases page in the default browser."""
     webbrowser.open(RELEASES_URL)
     ok(f"Opening: {color(RELEASES_URL, COLOR_CYAN)}")
+
+
+def open_issues_page():
+    """Open the GitHub issues page in the default browser."""
+    webbrowser.open(ISSUES_URL)
+    ok(f"Opening: {color(ISSUES_URL, COLOR_CYAN)}")
+
+
+def handle_patch_failure():
+    """Handle patch failure or signature not found.
+
+    Checks for updates:
+    - If an update is available, offers to open the releases page to install it.
+    - If using the latest version (or no update available), offers to create an issue on GitHub.
+    """
+    from patcher.cli import confirmed
+
+    print()
+    info("Checking for patcher updates...")
+    has_update = check_for_updates(silent=True)
+
+    if has_update and isinstance(LAST_UPDATE_RESULT, tuple) and LAST_UPDATE_RESULT[0] == "update_available":
+        _, tag, url = LAST_UPDATE_RESULT
+        info(f"An update for Open Antigravity Patcher is available: {color(tag, COLOR_GREEN, COLOR_BOLD)} (current: {color(VERSION, COLOR_YELLOW)})")
+        hint(f"Download: {color(url, COLOR_CYAN)}")
+        if confirmed("A patcher update is available. Would you like to open the releases page to install it?"):
+            webbrowser.open(url or RELEASES_URL)
+            ok(f"Opening: {color(url or RELEASES_URL, COLOR_CYAN)}")
+    else:
+        if LAST_UPDATE_RESULT == "up_to_date":
+            ok(f"You are using the latest version of Open Antigravity Patcher (v{VERSION}).")
+
+        hint(f"Issue tracker: {color(ISSUES_URL, COLOR_CYAN)}")
+        if confirmed("Would you like to open GitHub to create an issue?"):
+            webbrowser.open(ISSUES_URL)
+            ok(f"Opening: {color(ISSUES_URL, COLOR_CYAN)}")
+
