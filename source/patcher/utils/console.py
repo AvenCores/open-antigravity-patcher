@@ -1,4 +1,5 @@
 import os
+import sys
 import ctypes
 from patcher.constants import (
     VERSION, COLOR_RESET, COLOR_CYAN, COLOR_GREEN, COLOR_YELLOW, COLOR_RED,
@@ -29,6 +30,16 @@ def setup_console():
     global USE_COLOR
     if os.name == "nt":
         os.system("chcp 65001 >nul")
+        if hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+        if hasattr(sys.stderr, "reconfigure"):
+            try:
+                sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
     USE_COLOR = enable_ansi()
 
 

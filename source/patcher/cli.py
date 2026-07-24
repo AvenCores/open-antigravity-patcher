@@ -26,7 +26,7 @@ from patcher.utils.console import (
     cancel,
 )
 from patcher.utils.file import file_size, format_bytes
-from patcher.utils.update import check_for_updates, open_releases_page
+from patcher.utils.update import check_for_updates, open_releases_page, print_update_status_notice
 
 from patcher.ide.discovery import (
     find_install_root,
@@ -239,6 +239,7 @@ def redraw_main_screen(main_js_path, manager_path="", agy_path="", show_search_l
     print_banner()
     print_target_info(main_js_path, manager_path, agy_path, show_search_line=show_search_line)
     print()
+    print_update_status_notice()
 
 
 def run_cli():
@@ -327,10 +328,10 @@ def run_cli():
                         if agy_p and os.path.isfile(agy_p):
                             agy_path = agy_p
 
-    redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
-
     # Auto-check for updates on startup
     check_for_updates(silent=True)
+
+    redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
 
     while True:
         print_menu_section("PATCH")
