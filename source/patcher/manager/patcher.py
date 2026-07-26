@@ -58,28 +58,55 @@ class Gate:
             raise LookupError("gate signature is not unique — refusing to guess")
         return ("unpatched", m.start() + self.offset)
 
+    def resolve(self, data):
+        """(kind, write-offset, concrete-gate). The concrete gate carries the fix bytes
+        and label to apply — so a MultiGate can hand back the arch-matching sub-gate."""
+        kind, off = self.find(data)
+        return kind, off, self
+
+
+class MultiGate:
+    """One logical gate whose machine code differs per CPU arch (the Manager's auth check
+    compiles to distinct amd64 vs arm64 instructions), so it declares one Gate signature
+    per arch. A given binary matches exactly one — different archs share no byte pattern —
+    so there's no ambiguity; the first that finds a match wins."""
+
+    def __init__(self, *gates, desc=""):
+        self.gates = gates
+        self.desc = desc
+
+    def resolve(self, data):
+        err = None
+        for g in self.gates:
+            try:
+                return g.resolve(data)
+            except LookupError as e:
+                err = e
+        raise err or LookupError("no gate signature matched")
+
 
 # language_server.exe / language_server (Go binary) auth validator gate:
 # cmp byte[rax+8],0 ; je short  ->  mov byte[rax+8],1 ; nop*2 (x64)
-# ldr x8, [x1, #8] -> movz x8, #1 (arm64)
+# ldrb w3,[x0,#8] ; tbz w3,#0,skip  ->  mov w3,#1 ; strb w3,[x0,#8] (arm64)
 # (hasValidAuth=true)
 # (wildcarded/re.S displacements)
-MANAGER_GATES = [
-    Gate(
-        rb"\x80\x78\x08\x00\x74.\x48\x8b.\x24.\x48\x89.\x60",
-        rb"\xc6\x40\x08\x01\x90\x90\x48\x8b.\x24.\x48\x89.\x60",
-        b"\xc6\x40\x08\x01\x90\x90",
-        offset=0,
-        desc="hasValidAuth=true (x64)",
-    ),
-    Gate(
-        rb"\x60\x04\x00\xb4\xe0\x27\x00\xf9\xe1\x2b\x00\xf9\xe0\x03\x7c\xb2\x41\xc6\x01\xd0\x21\x20\x38\x91\xe2\x03\x40\xb2....\xe1\x27\x40\xf9\x61\x00\x00\xb4\x28\x04\x40\xf9\x02\x00\x00\x14\xe8\x03\x01\xaa\x08\x00\x00\xf9",
-        rb"\x60\x04\x00\xb4\xe0\x27\x00\xf9\xe1\x2b\x00\xf9\xe0\x03\x7c\xb2\x41\xc6\x01\xd0\x21\x20\x38\x91\xe2\x03\x40\xb2....\xe1\x27\x40\xf9\x61\x00\x00\xb4\x28\x00\x80\xd2\x02\x00\x00\x14\xe8\x03\x01\xaa\x08\x00\x00\xf9",
-        b"\x28\x00\x80\xd2",
-        offset=40,
-        desc="hasValidAuth=true (arm64)",
-    )
-]
+MANAGER_GATE_X64 = Gate(
+    rb"\x80\x78\x08\x00\x74.\x48\x8b.\x24.\x48\x89.\x60",
+    rb"\xc6\x40\x08\x01\x90\x90\x48\x8b.\x24.\x48\x89.\x60",
+    b"\xc6\x40\x08\x01\x90\x90",
+    offset=0,
+    desc="hasValidAuth=true (x64)",
+)
+
+MANAGER_GATE_ARM64 = Gate(
+    rb"\x03\x20\x40\x39\xc3..\x36........\x03\x10\x06\xa9",
+    rb"\x23\x00\x80\x52\x03\x20\x00\x39........\x03\x10\x06\xa9",
+    b"\x23\x00\x80\x52\x03\x20\x00\x39",
+    offset=0,
+    desc="hasValidAuth=true (arm64)",
+)
+
+MANAGER_GATE = MultiGate(MANAGER_GATE_X64, MANAGER_GATE_ARM64, desc="hasValidAuth=true")
 
 
 from patcher.manager.discovery import find_asar_relative_to_manager, read_package_json_from_asar
@@ -124,13 +151,11 @@ def get_status(path):
         return ("unknown", None)
     try:
         with _mapped(path) as d:
-            for gate in MANAGER_GATES:
-                try:
-                    state, off = gate.find(d)
-                    return (state, gate)
-                except LookupError:
-                    continue
-            return ("unknown", None)
+            try:
+                state, off, g = MANAGER_GATE.resolve(d)
+                return (state, g)
+            except LookupError:
+                return ("unknown", None)
     except OSError:
         return ("unknown", None)
 
@@ -202,16 +227,10 @@ def do_patch_manager(path):
         matched_gate = None
         try:
             with _mapped(path) as d:
-                kind = "unknown"
-                for gate in MANAGER_GATES:
-                    try:
-                        kind, off = gate.find(d)
-                        matched_gate = gate
-                        break
-                    except LookupError:
-                        continue
-                if not matched_gate:
-                    err("gate signature not found (unsupported version?)")
+                try:
+                    kind, off, matched_gate = MANAGER_GATE.resolve(d)
+                except LookupError as e:
+                    err(f"{e}")
                     handle_patch_failure()
                     return
                 if kind == "patched":

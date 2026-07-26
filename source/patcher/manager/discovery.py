@@ -119,7 +119,7 @@ def find_manager_binary():
             cands += glob.glob(os.path.join(root, "*ntigravity*", "*", rel))
             # macOS .app support
             if sys.platform == "darwin":
-                cands += glob.glob(os.path.join(root, "*ntigravity*.app", "Contents", "Resources", "app", rel))
+                cands += glob.glob(os.path.join(root, "*ntigravity*.app", "Contents", "Resources", "bin", "language_server"))
             direct = os.path.join(root, rel)
             if os.path.isfile(direct):
                 cands.append(direct)
@@ -149,7 +149,7 @@ def resolve_manager_path(raw_path):
             return path1
         # macOS app contents
         if sys.platform == "darwin":
-            path2 = os.path.join(resolved, "Contents", "Resources", "app", rel)
+            path2 = os.path.join(resolved, "Contents", "Resources", "bin", "language_server")
             if os.path.isfile(path2):
                 return path2
         # direct bin inside
