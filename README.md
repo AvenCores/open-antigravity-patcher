@@ -88,6 +88,42 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 }
 ```
 
+## 💡 Antigravity CLI и авто-обновления
+Последняя рабочая версия Antigravity CLI — **[v1.1.7](https://github.com/google-antigravity/antigravity-cli/releases/tag/1.1.7)**.
+Замените им ваш текущий установленный бинарник `agy` / `agy.exe` если версия вашего CLI выше.
+
+В экосистеме Antigravity авто-обновление работает на двух уровнях:
+1. **Внутренний модуль `bg-updater` самого `agy.exe`** — отключается патчем **PATCH ➔ `4`** в патчере.
+2. **Внешний сервис Antigravity 2.0 (`language_server.exe`)** — при запуске проверяет сервера Google и **принудительно перезаписывает `agy.exe`** свежей версией поверх вашего файла.
+
+### 🛡️ Блокировка авто-обновления
+
+ Чтобы полностью заблокировать перезапись бинарника:
+
+1. **Защитите файл `agy` от перезаписи фоновым сервисом (Read-Only)**:
+   После применения патча установите для `agy.exe` атрибут «Только чтение». Фоновый сервис `language_server` не сможет перезаписать ваш файл.
+   * **Windows (CMD / PowerShell)**:
+     ```cmd
+     attrib +r "C:\Users\%USERNAME%\AppData\Local\agy\bin\agy.exe"
+     ```
+     *(Или в Свойствах файла `agy.exe` поставьте галочку **«Только чтение»**).*
+   * **Linux / macOS**:
+     ```bash
+     chmod 555 ~/.local/bin/agy
+     ```
+
+2. **Встроенный байт-патч (PATCH ➔ `4`: Disable Auto-Update)**:
+   Отключает модуль `bg-updater` внутри самого бинарника `agy`/`agy.exe` (`c6 42 50 00`).
+
+3. **Переменная окружения `AGY_CLI_DISABLE_AUTO_UPDATE` (Не проверено в долгосрочной перспективе)**:
+   Точное имя переменной, зашитое в Go-коде `agy`:
+   * **Windows (CMD)**: `setx AGY_CLI_DISABLE_AUTO_UPDATE true`
+   * **Windows (PowerShell)**: `[System.Environment]::SetEnvironmentVariable("AGY_CLI_DISABLE_AUTO_UPDATE", "true", "User")`
+   * **Linux / macOS**: добавьте `export AGY_CLI_DISABLE_AUTO_UPDATE=true` в `~/.bashrc` / `~/.zshrc`.
+
+4. **Флаг запуска CLI (Не проверено в долгосрочной перспективе)**:
+   `agy --bg-updater=false`
+
 ## ⚠️ Ошибка лицензии Antigravity CLI (#3501)
 Если в Antigravity CLI (`agy`) появляется ошибка `You do not have a valid license of this product`, это не проблема локального патча и не экран `Eligibility Check`.
 
@@ -108,8 +144,9 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 
 ## 🌟 Возможности
 - Автоматический поиск установленного Antigravity 2.0, Antigravity IDE и Antigravity CLI (`agy`) в стандартных путях и реестре Windows.
-- **Проверка обновлений** — автоматическая проверка новых версий при запуске и ручная проверка через меню (TOOLS → `7`).
+- **Проверка обновлений** — автоматическая проверка новых версий при запуске и ручная проверка через меню (TOOLS → `8`).
 - **Патч Antigravity CLI** — снятие экрана «Eligibility Check» в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
+- **Отключение авто-обновлений CLI (Disable Auto-Update)** — байт-патчинг `bg-updater` в `agy`/`agy.exe` для отключения проверки и загрузки обновлений.
 - **Патч Antigravity Manager (`language_server`)** — снятие проверки авторизации (`hasValidAuth=true`) в скомпилированном бинарнике бэкенда по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
 - Поддержка Linux: поиск по `/usr/share/antigravity-ide`, определение версии через `dpkg`, `rpm` и `package.json`.
 - Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js`.
@@ -132,14 +169,15 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 | `1` Antigravity IDE patch | Применить патч к `main.js` для Antigravity IDE (bypass region lock) |
 | `2` Antigravity 2.0 patch | Применить патч к бинарному файлу `language_server` (Antigravity Manager) |
 | `3` Antigravity CLI (agy) patch | Применить патч к бинарю `agy`/`agy.exe` (unlock agy tool) |
+| `4` Disable Auto-Update (agy) | Отключить авто-обновление `bg-updater` в `agy`/`agy.exe` |
 | **RESTORE** | |
-| `4` Antigravity IDE | Восстановить оригинальный `main.js` для Antigravity IDE из бэкапа |
-| `5` Antigravity 2.0 | Восстановить оригинальный `language_server` из бэкапа |
-| `6` Antigravity CLI | Восстановить оригинальный `agy`/`agy.exe` из бэкапа |
+| `5` Antigravity IDE | Восстановить оригинальный `main.js` для Antigravity IDE из бэкапа |
+| `6` Antigravity 2.0 | Восстановить оригинальный `language_server` из бэкапа |
+| `7` Antigravity CLI | Восстановить оригинальный `agy`/`agy.exe` из бэкапа |
 | **TOOLS** | |
-| `7` Check for updates | Проверить наличие новых версий на GitHub |
-| `8` Open GitHub repository | Открыть страницу проекта в браузере |
-| `9` Select custom path | Выбрать путь к папке приложения или файлу вручную |
+| `8` Check for updates | Проверить наличие новых версий на GitHub |
+| `9` Open GitHub repository | Открыть страницу проекта в браузере |
+| `10` Select custom path | Выбрать путь к папке приложения или файлу вручную |
 | **`0` Exit** | Выйти из патчера |
 
 Запуск из исходников:
@@ -210,13 +248,14 @@ xattr -dr com.apple.quarantine Open_AG_Patcher_macOS
 - **PATCH → `1`** (Antigravity IDE patch) для `Antigravity IDE.app`
 - **PATCH → `2`** (Antigravity 2.0 patch) для `Antigravity.app` (бэкенд language_server)
 - **PATCH → `3`** (Antigravity CLI (agy) patch) для бинаря `agy` (если установлен)
-- **RESTORE → `4`**, `5` или `6` для восстановления из бэкапа
+- **PATCH → `4`** (Disable Auto-Update (agy)) для отключения авто-обновления `agy`
+- **RESTORE → `5`**, `6` или `7` для восстановления из бэкапа
 
 Для `Antigravity.app` патчер обычно сам находит:
 ```text
 /Applications/Antigravity.app
 ```
-Если автопоиск не нашел приложение, выберите **TOOLS → `9`** (Select custom path) и укажите один из путей:
+Если автопоиск не нашел приложение, выберите **TOOLS → `10`** (Select custom path) и укажите один из путей:
 ```text
 /Applications/Antigravity.app
 /Applications/Antigravity IDE.app
@@ -251,7 +290,7 @@ Antigravity Manager (`language_server` или `language_server.exe`) — бэк�
 - **ARM64** (Linux arm64 / Apple Silicon macOS): Находит и заменяет последовательность `ldrb w3, [x0, #8] ; tbz w3, #0, skip` на `mov w3, #1 ; strb w3, [x0, #8]` (`\x23\x00\x80\x52\x03\x20\x00\x39`).
 
 В результате возвращаемое значение `hasValidAuth` всегда принудительно выставляется в `true`, снимая блокировку.
-Патч обратим через **RESTORE → `5`** восстановлением оригинального бинарника из `.agybak`.
+Патч обратим через **RESTORE → `6`** восстановлением оригинального бинарника из `.agybak`.
 
 ### Патч для Antigravity CLI (agy)
 
@@ -282,11 +321,23 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 **Безопасность патча:**
 - Если байтовая сигнатура не найдена в бинаре (неизвестная/неподдерживаемая версия), патчер **отказывается патчить** и ничего не меняет — выводится «signature not found (unsupported version?)».
 - Если сигнатура встречается больше одного раза, патчер тоже отказывается («not unique — refusing to guess») — не угадывает, какой сайт править.
-- Откат выполняется через **RESTORE → `6`** (Antigravity CLI) восстановлением из `.agybak`.
+- Откат выполняется через **RESTORE → `7`** (Antigravity CLI) восстановлением из `.agybak`.
 
 > **Примечание по платформам:** сигнатура для x86-64 проверена под Windows и Intel macOS, для ARM64 — под Apple Silicon macOS. Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
 
 > **Примечание:** проверка «Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location» выполняется на стороне сервера. Патч снимает только локальный косметический экран «⚠ Eligibility Check» в `handleAuthResult`, но не может обойти серверную проверку доступности региона.
+
+### Патч отключения авто-обновления Antigravity CLI (Disable Auto-Update)
+
+В бинарнике Antigravity CLI авто-обновление нейтрализуется двухуровневым машинным байт-патчем через опцию **PATCH ➔ `4` (Disable Auto-Update (agy))**:
+1. **Флаг фоновой проверки `bg-updater`**:
+   * Находит инструкцию включения флага `mov byte ptr [rdx+0x50], 1` (`\xc6\x42\x50\x01`).
+   * Заменяет значение байта на `0x00` (`\xc6\x42\x50\x00`), полностью отключая ветку фонового таймера проверки.
+2. **Ядро функции обновления (`sub_14273BE40`)**:
+   * Находит точку входа основной скомпилированной функции проверки, загрузки и установки релизов с серверов Google (по сигнатуре инструкции `Checking for updates...`).
+   * Патчит точку входа на команды мгновенного возврата `xor rax, rax; xor rbx, rbx; ret; nop` (`\x48\x31\xc0\x48\x31\xdb\xc3\x90`).
+   * В результате при ЛЮБОМ вызове (ручном `agy update` или вызове из IDE) функция обновления мгновенно возвращает результат `nil` без вызова сетевых функций и скачиваний.
+
 
 ## 🔍 Логика поиска файла
 
@@ -318,7 +369,7 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 
 Бинарь `agy` (`agy.exe` на Windows) ищется location-agnostic — по `PATH` и стандартным каталогам, без хардкодных путей/версий:
 
-1. Аргумент командной строки или **TOOLS → `9` → `3`** (путь к файлу `agy`/`agy.exe` или к папке).
+1. Аргумент командной строки или **TOOLS → `10` → `3`** (путь к файлу `agy`/`agy.exe` или к папке).
 2. `PATH` (`shutil.which("agy")`).
 3. Стандартные каталоги:
    - **Windows:** `%LOCALAPPDATA%`, `%PROGRAMFILES%`, `%PROGRAMFILES(X86)%`, `%ProgramData%`, `%APPDATA%` (+ подпапки `Programs`), scoop (`%USERPROFILE%\scoop\apps`, `%SCOOP%\apps`). Шаблоны: `agy/bin/agy.exe`, `agy/*/bin/agy.exe` (scoop version-dirs), `agy*/agy.exe`.

@@ -109,6 +109,33 @@ CLI_GATE = MultiGate(
     desc="eligibility screen off",
 )
 
+# ---------------------------------------------------------------------------
+# Gate 2 (bg-updater & updater core): disable automatic background update checking/installing.
+# amd64: mov rdx,[rax]; mov byte ptr [rdx+0x50], 1 -> patch 1 -> 0
+CLI_AUTOUPDATE_BG_X64 = Gate(
+    rb"\x48\x8d\x0d[\s\S]{4}\xbf\x0a\x00\x00\x00[\s\S]{5}\x48\x8b\x10\xc6\x42\x50\x01\x90[\s\S]{50,70}\x48\x8d\x0d[\s\S]{4}\xbf\x0a\x00\x00\x00[\s\S]{5}\x48\x8b\x10\xc6\x42\x50\x01",
+    rb"\x48\x8d\x0d[\s\S]{4}\xbf\x0a\x00\x00\x00[\s\S]{5}\x48\x8b\x10\xc6\x42\x50\x01\x90[\s\S]{50,70}\x48\x8d\x0d[\s\S]{4}\xbf\x0a\x00\x00\x00[\s\S]{5}\x48\x8b\x10\xc6\x42\x50\x00",
+    b"\x00",
+    offset=0x64,
+    desc="disable bg-updater flag (x64)",
+)
+
+# amd64: updater core function sub_14273BE40 entry -> patch to immediate return (xor rax, rax; xor rbx, rbx; ret; nop)
+CLI_AUTOUPDATE_CORE_X64 = Gate(
+    rb"\x4c\x8d\xa4\x24[\s\S]{4}\x4d\x3b\x66\x10[\s\S]{6}\x55\x48\x89\xe5\x48\x81\xec\x10\x07\x00\x00[\s\S]{30,60}\xe8[\s\S]{4}\x48\x85\xc9\x0f\x84",
+    rb"\x48\x31\xc0\x48\x31\xdb\xc3\x90\x4d\x3b\x66\x10[\s\S]{6}\x55\x48\x89\xe5\x48\x81\xec\x10\x07\x00\x00[\s\S]{30,60}\xe8[\s\S]{4}\x48\x85\xc9\x0f\x84",
+    b"\x48\x31\xc0\x48\x31\xdb\xc3\x90",
+    offset=0,
+    desc="disable updater core function (x64)",
+)
+
+CLI_AUTOUPDATE_GATE = MultiGate(
+    CLI_AUTOUPDATE_BG_X64,
+    CLI_AUTOUPDATE_CORE_X64,
+    desc="disable auto-update",
+)
+
+
 
 @contextlib.contextmanager
 def _mapped(path):
@@ -152,6 +179,27 @@ def get_status(path):
 def is_already_patched(path):
     """Совместимый с IDE/asar интерфейс: True только если патч уже применён."""
     return get_status(path)[0] == "patched"
+
+
+def get_autoupdate_status(path):
+    """('patched'|'unpatched'|'unknown', None) — без исключений наружу."""
+    if not path or not os.path.isfile(path):
+        return ("unknown", None)
+    try:
+        with _mapped(path) as d:
+            try:
+                state, off, g = CLI_AUTOUPDATE_GATE.resolve(d)
+                return (state, g)
+            except LookupError:
+                return ("unknown", None)
+    except OSError:
+        return ("unknown", None)
+
+
+def is_autoupdate_disabled(path):
+    """True если фоновое авто-обновление отключено байт-патчем."""
+    return get_autoupdate_status(path)[0] == "patched"
+
 
 
 def _make_backup(path):
@@ -285,6 +333,111 @@ def do_patch_agy(path):
         panel_rows.append(("After", f"{hash_after[:8]}...{hash_after[56:]}"))
     print_panel("PATCH COMPLETE", panel_rows)
     hint("Restart Antigravity CLI for the change to take effect.")
+
+
+def do_disable_autoupdate(path):
+    from patcher.cli import confirmed
+    from patcher.utils.captcha import confirm_with_captcha
+
+    if not path or not os.path.isfile(path):
+        from patcher.cli import offer_download_and_block
+        offer_download_and_block("Antigravity CLI")
+        return
+
+    hash_before = file_hash(path)
+    info(f"Target: {color(path, COLOR_CYAN)}")
+    hint(f"Size: {color(format_bytes(file_size(path)), COLOR_CYAN)}")
+    print()
+
+    write_success = False
+    kind = off = gate = None
+    for attempt in range(2):
+        if is_locked(path):
+            if attempt == 0:
+                warn("Binary is locked (Antigravity CLI is running).")
+                if confirmed("Would you like to automatically close running agy processes and retry?"):
+                    terminate_processes(["agy"])
+                    import time
+                    time.sleep(1.5)
+                    continue
+            err("File is locked — close Antigravity CLI first.")
+            return
+
+        patches_to_apply = []
+        try:
+            with _mapped(path) as d:
+                for g in [CLI_AUTOUPDATE_BG_X64, CLI_AUTOUPDATE_CORE_X64]:
+                    try:
+                        k, o, _ = g.resolve(d)
+                        if k == "unpatched":
+                            patches_to_apply.append((o, g))
+                    except LookupError:
+                        pass
+                if not patches_to_apply:
+                    hint("Auto-update is already disabled.")
+                    if not confirm_with_captcha("Apply patch anyway?"):
+                        return
+                    # Fallback to resolving via MultiGate if forced
+                    try:
+                        k, o, g = CLI_AUTOUPDATE_GATE.resolve(d)
+                        patches_to_apply.append((o, g))
+                    except LookupError as e:
+                        err(f"{e}")
+                        handle_patch_failure()
+                        return
+        except OSError as e:
+            err(f"Read error: {e}")
+            return
+
+        _make_backup(path)
+
+        try:
+            with open(path, "r+b") as f:
+                for o, g in patches_to_apply:
+                    f.seek(o)
+                    f.write(g.fix)
+                f.flush()
+                os.fsync(f.fileno())
+            write_success = True
+            break
+        except PermissionError as e:
+            if attempt == 0:
+                warn(f"Permission denied (file locked): {e}")
+                if confirmed("Would you like to automatically close running agy processes and retry?"):
+                    terminate_processes(["agy"])
+                    import time
+                    time.sleep(1.5)
+                    continue
+            err(f"Write error (Permission denied): {e}")
+            handle_patch_failure()
+            return
+        except Exception as e:
+            err(f"Write error: {e}")
+            handle_patch_failure()
+            return
+
+    if not write_success:
+        handle_patch_failure()
+        return
+
+    hash_after = file_hash(path)
+    resign_macos_bundle(path)
+    resign_macos_binary(path)
+    if os.name == "posix":
+        _copy_to_user_bin(path)
+    desc_str = f"patched {len(patches_to_apply)} autoupdate gate(s)" if patches_to_apply else "disable auto-update"
+    step("Disable Auto-Update (bg-updater & core)", True, desc_str)
+    print()
+    panel_rows = [
+        ("Target", os.path.basename(path)),
+        ("Gates Applied", str(len(patches_to_apply))),
+    ]
+    for o, g in patches_to_apply:
+        panel_rows.append(("Gate", f"{g.desc} @ 0x{o:x}"))
+    if hash_before and hash_after:
+        panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
+        panel_rows.append(("After", f"{hash_after[:8]}...{hash_after[56:]}"))
+    print_panel("DISABLE AUTO-UPDATE COMPLETE", panel_rows)
 
 
 def do_restore_agy(path):

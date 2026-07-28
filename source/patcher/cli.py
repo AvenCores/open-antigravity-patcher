@@ -36,7 +36,14 @@ from patcher.ide.discovery import (
 )
 from patcher.ide.patcher import is_already_patched, do_patch, do_restore
 from patcher.agy.discovery import find_agy_binary, resolve_agy_path
-from patcher.agy.patcher import is_already_patched as is_agy_patched, do_patch_agy, do_restore_agy
+from patcher.agy.patcher import (
+    is_already_patched as is_agy_patched,
+    do_patch_agy,
+    do_restore_agy,
+    is_autoupdate_disabled,
+    do_disable_autoupdate,
+)
+
 
 from patcher.manager.discovery import find_manager_binary, resolve_manager_path, get_antigravity_version
 from patcher.manager.patcher import is_already_patched as is_mgr_patched, do_patch_manager, do_restore_manager
@@ -228,6 +235,9 @@ def print_target_info(main_js_path, manager_path="", agy_path="", show_search_li
         patched = is_agy_patched(agy_path)
         _kv("Patch:", "already patched" if patched else "not patched",
             COLOR_YELLOW if patched else COLOR_GREEN)
+        autoupd_off = is_autoupdate_disabled(agy_path)
+        _kv("Auto-Upd:", "disabled" if autoupd_off else "enabled",
+            COLOR_YELLOW if autoupd_off else COLOR_GREEN)
         size = file_size(agy_path)
         _kv("Size:", format_bytes(size), COLOR_GREEN if size > 0 else COLOR_YELLOW)
     else:
@@ -338,16 +348,17 @@ def run_cli():
         print_menu_row("1", "Antigravity IDE patch", "bypass region lock (isGoogleInternal)", COLOR_GREEN)
         print_menu_row("2", "Antigravity 2.0 patch", "patch language_server binary", COLOR_GREEN)
         print_menu_row("3", "Antigravity CLI (agy) patch", "unlock agy tool", COLOR_GREEN)
+        print_menu_row("4", "Disable Auto-Update (agy)", "disable bg-updater auto update", COLOR_GREEN)
 
         print_menu_section("RESTORE")
-        print_menu_row("4", "Antigravity IDE", "from backup", COLOR_YELLOW)
-        print_menu_row("5", "Antigravity 2.0", "from backup", COLOR_YELLOW)
-        print_menu_row("6", "Antigravity CLI", "from backup", COLOR_YELLOW)
+        print_menu_row("5", "Antigravity IDE", "from backup", COLOR_YELLOW)
+        print_menu_row("6", "Antigravity 2.0", "from backup", COLOR_YELLOW)
+        print_menu_row("7", "Antigravity CLI", "from backup", COLOR_YELLOW)
 
         print_menu_section("TOOLS")
-        print_menu_row("7", "Check for updates", "check GitHub releases", COLOR_CYAN)
-        print_menu_row("8", "Open GitHub repository", "source & updates", COLOR_CYAN)
-        print_menu_row("9", "Select custom path", "override auto-detected target", COLOR_CYAN)
+        print_menu_row("8", "Check for updates", "check GitHub releases", COLOR_CYAN)
+        print_menu_row("9", "Open GitHub repository", "source & updates", COLOR_CYAN)
+        print_menu_row("10", "Select custom path", "override auto-detected target", COLOR_CYAN)
 
         print()
         print_menu_row("0", "Exit", "quit the patcher", COLOR_RED)
@@ -364,7 +375,7 @@ def run_cli():
             redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
             continue
 
-        valid_choices = {str(i) for i in range(1, 10)}
+        valid_choices = {str(i) for i in range(1, 11)}
         if choice not in valid_choices:
             err("Invalid choice")
             print()
@@ -404,23 +415,32 @@ def run_cli():
                     searched = False
                     do_patch_agy(agy_path)
         elif choice == "4":
+            if agy_path and os.path.isfile(agy_path):
+                do_disable_autoupdate(agy_path)
+            else:
+                new_p = offer_download_and_block("Antigravity CLI", target_type="agy")
+                if new_p:
+                    agy_path = new_p
+                    searched = False
+                    do_disable_autoupdate(agy_path)
+        elif choice == "5":
             if main_js_path:
                 do_restore(main_js_path, show_search_line=searched)
             else:
-                err("Antigravity IDE path is not set. Please select custom path (Option 9) first.")
-        elif choice == "5":
+                err("Antigravity IDE path is not set. Please select custom path (Option 10) first.")
+        elif choice == "6":
             if manager_path:
                 do_restore_manager(manager_path)
             else:
-                err("Antigravity 2.0 (language_server) path is not set. Please select custom path (Option 9) first.")
-        elif choice == "6":
+                err("Antigravity 2.0 (language_server) path is not set. Please select custom path (Option 10) first.")
+        elif choice == "7":
             if agy_path:
                 do_restore_agy(agy_path)
             else:
-                err("Antigravity CLI path is not set. Please select custom path (Option 9) first.")
-        elif choice == "7":
-            check_for_updates(silent=False)
+                err("Antigravity CLI path is not set. Please select custom path (Option 10) first.")
         elif choice == "8":
+            check_for_updates(silent=False)
+        elif choice == "9":
             print_target_info(main_js_path, manager_path, agy_path, show_search_line=searched)
             print()
             if confirmed("Open GitHub repository in browser?"):
@@ -429,7 +449,7 @@ def run_cli():
                 ok(f"Opening: {color(url, COLOR_CYAN)}")
             else:
                 cancel("Cancelled.")
-        elif choice == "9":
+        elif choice == "10":
             while True:
                 redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
                 print_menu_section("SELECT CUSTOM PATH")
