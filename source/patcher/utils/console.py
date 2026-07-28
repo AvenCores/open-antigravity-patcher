@@ -124,16 +124,22 @@ def print_banner():
 def print_panel(title, rows, accent=COLOR_GREEN):
     """Render a compact framed summary panel for operation results."""
     print()
-    print(f"  {_frame_border('╔', '═', '╗', accent)}")
-    print(f"  {_frame_row(color(title, COLOR_BOLD), accent=accent)}")
-    print(f"  {_frame_border('╟', '─', '╢', accent)}")
-    for label, value in rows:
-        value = str(value)
-        if "\x1b[" not in value:
-            value = color(value, COLOR_CYAN)
-        label_text = color(f"{label}:", COLOR_WHITE)
-        print(f"  {_frame_row(label_text, value, accent=accent)}")
-    print(f"  {_frame_border('╚', '═', '╝', accent)}")
+    try:
+        print(f"  {_frame_border('╔', '═', '╗', accent)}")
+        print(f"  {_frame_row(color(title, COLOR_BOLD), accent=accent)}")
+        print(f"  {_frame_border('╟', '─', '╢', accent)}")
+        for label, value in rows:
+            val_str = str(value)
+            if "\x1b[" not in val_str:
+                val_str = color(val_str, COLOR_CYAN)
+            label_text = color(f"{label}:", COLOR_WHITE)
+            print(f"  {_frame_row(label_text, val_str, accent=accent)}")
+        print(f"  {_frame_border('╚', '═', '╝', accent)}")
+    except UnicodeEncodeError:
+        print(f"--- {title} ---")
+        for label, value in rows:
+            print(f"  {label}: {value}")
+        print("-" * (len(title) + 8))
     print()
 
 
@@ -177,7 +183,14 @@ def step(name, applied, detail=""):
     line = f"  {marker} {name}"
     if detail:
         line += color(f" — {detail}", COLOR_DIM)
-    print(line)
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        safe_marker = "[*]" if applied is None else ("[+]" if applied else "[x]")
+        safe_line = f"  {safe_marker} {name}"
+        if detail:
+            safe_line += f" - {detail}"
+        print(safe_line)
 
 
 def _center_line(text, width=MENU_WIDTH):

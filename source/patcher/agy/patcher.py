@@ -84,39 +84,30 @@ class MultiGate:
         raise err or LookupError("no gate signature matched")
 
 
-# agy's handleAuthResult gates the cosmetic "Eligibility Check" on the server
-# AuthResult's hasValidAuth (+8). Both native architectures are supported:
-#
-# amd64 (Windows, Linux x64, Intel macOS):
-#   test rax,rax ; je ; cmp byte[rax+8],0 ; jne eligible
-# rax is non-null here (the je above), so rewriting the compare to `test rax,rax`+nop
-# keeps ZF=0 -> the jne always takes the eligible branch. The trailing result-shape
-# checks make the signature unique even in Mach-O, which contains byte-like data outside
-# executable code that matched the older, shorter pattern.
+# ---------------------------------------------------------------------------
+# Gate 1 (handleAuthResult): cosmetic "Eligibility Check" screen.
+# amd64: mov rdi,[rax+0x20]; test rdi,rdi; je eligible → patch je→jmp
 CLI_GATE_X64 = Gate(
-    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85...."
-    rb"\x48\x8b\x50\x50\x4c\x8d\x1d....\x66\x90\x4c\x39\x58\x48",
-    rb"\x48\x85\xc0\x0f\x84....\x48\x85\xc0\x90\x0f\x85...."
-    rb"\x48\x8b\x50\x50\x4c\x8d\x1d....\x66\x90\x4c\x39\x58\x48",
-    b"\x48\x85\xc0\x90",
-    offset=9,
+    rb"\x48\x8b\x78\x20\x48\x85\xff\x74\x52",
+    rb"\x48\x8b\x78\x20\x48\x85\xff\xeb\x52",
+    b"\xeb",
+    offset=7,
     desc="eligibility screen off (x64)",
 )
-
-# arm64 (Windows ARM64, Linux arm64, Apple Silicon):
-#   cbnz x1,error ; cbz x0,eligible ; ldrb w8,[x0,#8] ; tbnz w8,#0,eligible
-# Replace only the load with `mov w8,#1`; the existing tbnz then always takes the
-# eligible branch. Branch displacement bytes are wildcarded so harmless layout changes
-# do not break detection, while the surrounding instructions keep the match unique.
+# arm64: ldr x20,[x19]; ldr x24,[x21,#0x18]; cbz x24,success → patch cbz→b
 CLI_GATE_ARM64 = Gate(
-    rb"...\xb5...\xb4\x08\x20\x40\x39...\x37\x08\xa4\x44\xa9",
-    rb"...\xb5...\xb4\x28\x00\x80\x52...\x37\x08\xa4\x44\xa9",
-    b"\x28\x00\x80\x52",
+    rb"\x74\x02\x40\xf9\xb8\x0e\x40\xf9\x78\x05\x00\xb4",
+    rb"\x74\x02\x40\xf9\xb8\x0e\x40\xf9\x2b\x00\x00\x14",
+    b"\x2b\x00\x00\x14",
     offset=8,
     desc="eligibility screen off (arm64)",
 )
 
-CLI_GATE = MultiGate(CLI_GATE_X64, CLI_GATE_ARM64, desc="eligibility screen off")
+CLI_GATE = MultiGate(
+    CLI_GATE_X64,
+    CLI_GATE_ARM64,
+    desc="eligibility screen off",
+)
 
 
 @contextlib.contextmanager
@@ -217,8 +208,7 @@ def do_patch_agy(path):
     print()
 
     write_success = False
-    off = 0
-    matched_gate = None
+    kind = off = gate = None
     for attempt in range(2):
         if is_locked(path):
             if attempt == 0:
@@ -235,7 +225,7 @@ def do_patch_agy(path):
         try:
             with _mapped(path) as d:
                 try:
-                    kind, off, matched_gate = CLI_GATE.resolve(d)
+                    kind, off, gate = CLI_GATE.resolve(d)
                 except LookupError as e:
                     err(f"{e}")
                     handle_patch_failure()
@@ -253,7 +243,7 @@ def do_patch_agy(path):
         try:
             with open(path, "r+b") as f:
                 f.seek(off)
-                f.write(matched_gate.fix)
+                f.write(gate.fix)
                 f.flush()
                 os.fsync(f.fileno())
             write_success = True
@@ -284,11 +274,11 @@ def do_patch_agy(path):
     if os.name == "posix":
         _copy_to_user_bin(path)
     print()
-    step("Patch agy binary", True, matched_gate.desc)
+    step("Patch agy binary", True, gate.desc)
     print()
     panel_rows = [
         ("Target", os.path.basename(path)),
-        ("Gate", f"{matched_gate.desc} @ 0x{off:x}"),
+        ("Gate", f"{gate.desc} @ 0x{off:x}"),
     ]
     if hash_before and hash_after:
         panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))

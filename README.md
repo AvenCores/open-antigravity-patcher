@@ -258,24 +258,22 @@ Antigravity Manager (`language_server` или `language_server.exe`) — бэк�
 Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, `agy` на Linux/macOS), который тоже показывает косметический экран «Eligibility Check», блокирующий дальнейшую работу. Поскольку это скомпилированный бинарь (не JS), патчинг выполняется **на уровне машинного кода** по уникальной байтовой сигнатуре под две архитектуры через `MultiGate`: **x86-64** (Windows / Linux x64 / Intel Mac) и **ARM64** (Windows ARM64 / Linux arm64 / Apple Silicon macOS).
 
 #### x86-64 (Intel Mac / Windows / Linux x64)
-1. В функции `handleAuthResult` eligibility-гейт строится на серверном поле `AuthResult.hasValidAuth` (байт по смещению `+8`):
+1. В функции `handleAuthResult` после считывания ответа сервера выполняется проверка массива причин блокировки аккаунта (`ineligibleTiers` по смещению `+0x20`):
    ```asm
-   test rax,rax      ; 48 85 c0
-   je   ...          ; 0f 84 xx xx xx xx
-   cmp  byte[rax+8],0; 80 78 08 00     <-- проверка eligibility
-   jne  ...          ; 0f 85 xx xx xx xx
+   mov rdi, qword ptr [rax+0x20] ; 48 8b 78 20     <-- адрес ineligibleTiers
+   test rdi, rdi                 ; 48 85 ff         <-- проверка на NULL (нет причин)
+   je  eligible                  ; 74 52            <-- переход к успеху если нет ограничений
    ```
-2. Патчер находит эту последовательность по сигнатуре и переписывает `cmp byte[rax+8],0` на `test rax,rax ; nop` (`48 85 c0 90`). При этом `ZF=0`, и условный переход `jne` всегда берёт «eligible»-ветку — экран Eligibility больше не показывается.
+2. Если `ineligibleTiers != NULL`, программа заходит в цикл сопоставления причин недоступности региона и помечает флаг `ineligible = 1`. Патчер заменяет условный переход `je` (`74 52`) на безусловный `jmp` (`eb 52`). В результате программа **всегда переходит на успешную ветку** (`ineligible = 0`), игнорируя серверный список блокировок региона.
 
 #### ARM64 (Windows ARM64 / Linux arm64 / Apple Silicon macOS)
-1. В функции `handleAuthResult` (или `handleAuthResult.func1`) проверяется поле `AuthResult.hasValidAuth` (байт по смещению `+8`):
+1. В функции `handleAuthResult` массив причин `ineligibleTiers` загружается по смещению `+0x18`:
    ```asm
-   cbnz x1, error_path   ; 01 20 00 b5
-   cbz  x0, failure_path ; a0 14 00 b4
-   ldrb w8, [x0, #8]     ; 08 20 40 39     <-- загрузка hasValidAuth
-   tbnz w8, #0, success  ; 68 14 00 37     <-- проверка eligibility
+   ldr x20, [x19]       ; 74 02 40 f9
+   ldr x24, [x21, #0x18]; b8 0e 40 f9     <-- загрузка ineligibleTiers
+   cbz x24, success_ret ; 78 05 00 b4     <-- переход к успеху при x24 == 0 (нет причин)
    ```
-2. Патчер находит эту последовательность по сигнатуре и заменяет инструкцию `ldrb w8, [x0, #8]` на `mov w8, #1` (`28 00 80 52`). В результате регистр `w8` всегда равен 1, и условный переход `tbnz` всегда переходит на success-путь, минуя экран блокировки. `MultiGate` автоматически выбирает подходящую x64 или arm64 сигнатуру.
+2. Патчер заменяет условный переход `cbz x24, success_ret` (`78 05 00 b4`) на безусловный переход `b success_ret` (`2b 00 00 14`). В результате условная проверка отменяется, и исполнение **принудительно перенаправляется на успешный возврат** (`ineligible = 0`), минуя разбор причин блокировки от сервера. `MultiGate` автоматически выбирает подходящую сигнатуру.
 
 #### Общие шаги
 3. Перед записью создаётся резервная копия `agy.exe.agybak` (или `agy.agybak` на POSIX). Если существующий бэкап устарел (приложение автообновилось), он автоматически обновляется — stale-копии не хранятся.
@@ -287,6 +285,8 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 - Откат выполняется через **RESTORE → `6`** (Antigravity CLI) восстановлением из `.agybak`.
 
 > **Примечание по платформам:** сигнатура для x86-64 проверена под Windows и Intel macOS, для ARM64 — под Apple Silicon macOS. Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
+
+> **Примечание:** проверка «Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location» выполняется на стороне сервера. Патч снимает только локальный косметический экран «⚠ Eligibility Check» в `handleAuthResult`, но не может обойти серверную проверку доступности региона.
 
 ## 🔍 Логика поиска файла
 

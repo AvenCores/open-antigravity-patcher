@@ -23,3 +23,5 @@ dist/
 .mimocode/
 
 antigravity
+agy_arm64_macos
+agy_x64_win.exe
