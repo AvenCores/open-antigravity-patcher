@@ -43,25 +43,24 @@ class Gate:
         self.desc = desc
 
     def find(self, data):
-        """('patched'|'unpatched', file offset to write at).
-        LookupError, если сигнатура отсутствует или не уникальна
-        (неизвестный билд — отказываемся угадывать)."""
-        m = self.patched.search(data)
-        if m:
-            return ("patched", m.start() + self.offset)
-        m = self.sig.search(data)
-        if not m:
+        """('patched'|'unpatched', [file offsets to write at]).
+        LookupError, если сигнатура отсутствует (неизвестный билд).
+        Несколько unpatched-вхождений допустимы — патчим все (Go может
+        компилировать одну функцию в нескольких экземплярах)."""
+        patched_offsets = [m.start() + self.offset for m in self.patched.finditer(data)]
+        if patched_offsets:
+            return ("patched", patched_offsets)
+        unpatched_offsets = [m.start() + self.offset for m in self.sig.finditer(data)]
+        if not unpatched_offsets:
             raise LookupError("gate signature not found (unsupported version?)")
-        if self.sig.search(data, m.end()):
-            raise LookupError("gate signature is not unique — refusing to guess")
-        return ("unpatched", m.start() + self.offset)
+        return ("unpatched", unpatched_offsets)
 
 
     def resolve(self, data):
-        """(kind, write-offset, concrete-gate). The concrete gate carries the fix bytes
+        """(kind, [write-offsets], concrete-gate). The concrete gate carries the fix bytes
         and label to apply — so a MultiGate can hand back the arch-matching sub-gate."""
-        kind, off = self.find(data)
-        return kind, off, self
+        kind, offsets = self.find(data)
+        return kind, offsets, self
 
 
 class MultiGate:
@@ -86,13 +85,21 @@ class MultiGate:
 
 # ---------------------------------------------------------------------------
 # Gate 1 (handleAuthResult): cosmetic "Eligibility Check" screen.
-# amd64: mov rdi,[rax+0x20]; test rdi,rdi; je eligible → patch je→jmp
+# amd64 (Win/Mac): mov rdi,[rax+0x20]; test rdi,rdi; je eligible → patch je→jmp
 CLI_GATE_X64 = Gate(
     rb"\x48\x8b\x78\x20\x48\x85\xff\x74\x52",
     rb"\x48\x8b\x78\x20\x48\x85\xff\xeb\x52",
     b"\xeb",
     offset=7,
     desc="eligibility screen off (x64)",
+)
+# amd64 (Linux): то же, но je near (0f 84 rel32) + Go дублирует функцию
+CLI_GATE_X64_LINUX = Gate(
+    rb"\x48\x8b\x78\x20\x48\x85\xff\x0f\x84....\x48\x89\x74\x24\x58",
+    rb"\x48\x8b\x78\x20\x48\x85\xff\xe9....\x48\x89\x74\x24\x58",
+    b"\xe9\x22\x01\x00\x00",
+    offset=7,
+    desc="eligibility screen off (x64/linux)",
 )
 # arm64: ldr x20,[x19]; ldr x24,[x21,#0x18]; cbz x24,success → patch cbz→b
 CLI_GATE_ARM64 = Gate(
@@ -105,6 +112,7 @@ CLI_GATE_ARM64 = Gate(
 
 CLI_GATE = MultiGate(
     CLI_GATE_X64,
+    CLI_GATE_X64_LINUX,
     CLI_GATE_ARM64,
     desc="eligibility screen off",
 )
@@ -267,14 +275,15 @@ def do_patch_agy(path):
                 all_patched = True
                 for gate_obj, gate_label in ALL_GATES:
                     try:
-                        kind, off, g = gate_obj.resolve(d)
+                        kind, offsets, g = gate_obj.resolve(d)
                     except LookupError as e:
                         err(f"{gate_label}: {e}")
                         handle_patch_failure()
                         return
                     if kind == "unpatched":
                         all_patched = False
-                        patches.append((off, g))
+                        for off in offsets:
+                            patches.append((off, g))
                 if all_patched:
                     hint("agy already patched (all gates).")
                     if not confirm_with_captcha("Apply patch anyway?"):
@@ -282,8 +291,9 @@ def do_patch_agy(path):
                     # re-patch: перезаписываем все гейты
                     patches = []
                     for gate_obj, _ in ALL_GATES:
-                        kind, off, g = gate_obj.resolve(d)
-                        patches.append((off, g))
+                        kind, offsets, g = gate_obj.resolve(d)
+                        for off in offsets:
+                            patches.append((off, g))
         except OSError as e:
             err(f"Read error: {e}")
             return
