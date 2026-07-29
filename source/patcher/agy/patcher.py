@@ -109,6 +109,27 @@ CLI_GATE = MultiGate(
     desc="eligibility screen off",
 )
 
+# ---------------------------------------------------------------------------
+# Gate 2 (eligibilityErrorFormatter): обход серверной проверки eligibility.
+# amd64: test rax,rax; je eligible → patch je→jmp (всегда GOOD-path)
+ELIGIBILITY_GATE_X64 = Gate(
+    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85....\xe8",
+    rb"\x48\x85\xc0\xe9....\x90\x80\x78\x08\x00\x0f\x85....\xe8",
+    b"\xe9\xf7\x01\x00\x00\x90",
+    offset=3,
+    desc="server eligibility bypass (x64)",
+)
+
+ELIGIBILITY_GATE = MultiGate(
+    ELIGIBILITY_GATE_X64,
+    desc="server eligibility bypass",
+)
+
+ALL_GATES = [
+    (CLI_GATE, "eligibility screen off"),
+    (ELIGIBILITY_GATE, "server eligibility bypass"),
+]
+
 
 @contextlib.contextmanager
 def _mapped(path):
@@ -135,16 +156,24 @@ def is_locked(path):
 
 
 def get_status(path):
-    """('patched'|'unpatched'|'unknown', None) — без исключений наружу."""
+    """('patched'|'unpatched'|'unknown', None) — без исключений наружу.
+    'patched' только если ВСЕ гейты применены."""
     if not path or not os.path.isfile(path):
         return ("unknown", None)
     try:
         with _mapped(path) as d:
-            try:
-                state, off, g = CLI_GATE.resolve(d)
-                return (state, g)
-            except LookupError:
-                return ("unknown", None)
+            states = []
+            for gate, _ in ALL_GATES:
+                try:
+                    state, off, g = gate.resolve(d)
+                    states.append(state)
+                except LookupError:
+                    return ("unknown", None)
+            if all(s == "patched" for s in states):
+                return ("patched", None)
+            if all(s == "unpatched" for s in states):
+                return ("unpatched", None)
+            return ("unpatched", None)  # частично применён — считаем unpatched
     except OSError:
         return ("unknown", None)
 
@@ -208,7 +237,7 @@ def do_patch_agy(path):
     print()
 
     write_success = False
-    kind = off = gate = None
+    patches = []  # [(offset, gate), ...] — гейты, требующие записи
     for attempt in range(2):
         if is_locked(path):
             if attempt == 0:
@@ -222,28 +251,43 @@ def do_patch_agy(path):
             return
 
         # Сканируем в mmap, закрываем ДО записи (zero-copy scan)
+        patches = []
         try:
             with _mapped(path) as d:
-                try:
-                    kind, off, gate = CLI_GATE.resolve(d)
-                except LookupError as e:
-                    err(f"{e}")
-                    handle_patch_failure()
-                    return
-                if kind == "patched":
-                    hint("agy already patched.")
+                all_patched = True
+                for gate_obj, gate_label in ALL_GATES:
+                    try:
+                        kind, off, g = gate_obj.resolve(d)
+                    except LookupError as e:
+                        err(f"{gate_label}: {e}")
+                        handle_patch_failure()
+                        return
+                    if kind == "unpatched":
+                        all_patched = False
+                        patches.append((off, g))
+                if all_patched:
+                    hint("agy already patched (all gates).")
                     if not confirm_with_captcha("Apply patch anyway?"):
                         return
+                    # re-patch: перезаписываем все гейты
+                    patches = []
+                    for gate_obj, _ in ALL_GATES:
+                        kind, off, g = gate_obj.resolve(d)
+                        patches.append((off, g))
         except OSError as e:
             err(f"Read error: {e}")
+            return
+
+        if not patches:
             return
 
         _make_backup(path)
 
         try:
             with open(path, "r+b") as f:
-                f.seek(off)
-                f.write(gate.fix)
+                for off, g in patches:
+                    f.seek(off)
+                    f.write(g.fix)
                 f.flush()
                 os.fsync(f.fileno())
             write_success = True
@@ -274,12 +318,13 @@ def do_patch_agy(path):
     if os.name == "posix":
         _copy_to_user_bin(path)
     print()
-    step("Patch agy binary", True, gate.desc)
+    step("Patch agy binary", True, f"{len(patches)} gate(s)")
     print()
     panel_rows = [
         ("Target", os.path.basename(path)),
-        ("Gate", f"{gate.desc} @ 0x{off:x}"),
     ]
+    for off, g in patches:
+        panel_rows.append(("Gate", f"{g.desc} @ 0x{off:x}"))
     if hash_before and hash_after:
         panel_rows.append(("Before", f"{hash_before[:8]}...{hash_before[56:]}"))
         panel_rows.append(("After", f"{hash_after[:8]}...{hash_after[56:]}"))
