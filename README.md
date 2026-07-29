@@ -109,7 +109,7 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 ## 🌟 Возможности
 - Автоматический поиск установленного Antigravity 2.0, Antigravity IDE и Antigravity CLI (`agy`) в стандартных путях и реестре Windows.
 - **Проверка обновлений** — автоматическая проверка новых версий при запуске и ручная проверка через меню (TOOLS → `7`).
-- **Патч Antigravity CLI** — снятие экрана «Eligibility Check» в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
+- **Патч Antigravity CLI** — снятие экрана «Eligibility Check» и обход серверной проверки eligibility (Gate 1 + Gate 2) в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
 - **Патч Antigravity Manager (`language_server`)** — снятие проверки авторизации (`hasValidAuth=true`) в скомпилированном бинарнике бэкенда по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
 - Поддержка Linux: поиск по `/usr/share/antigravity-ide`, определение версии через `dpkg`, `rpm` и `package.json`.
 - Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js`.
@@ -255,25 +255,54 @@ Antigravity Manager (`language_server` или `language_server.exe`) — бэк�
 
 ### Патч для Antigravity CLI (agy)
 
-Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, `agy` на Linux/macOS), который тоже показывает косметический экран «Eligibility Check», блокирующий дальнейшую работу. Поскольку это скомпилированный бинарь (не JS), патчинг выполняется **на уровне машинного кода** по уникальной байтовой сигнатуре под две архитектуры через `MultiGate`: **x86-64** (Windows / Linux x64 / Intel Mac) и **ARM64** (Windows ARM64 / Linux arm64 / Apple Silicon macOS).
+Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, `agy` на Linux/macOS), который показывает косметический экран «Eligibility Check» и формирует ошибку «Account ineligible» по ответу сервера. Поскольку это скомпилированный бинарь (не JS), патчинг выполняется **на уровне машинного кода** по уникальной байтовой сигнатуре под две архитектуры через `MultiGate`: **x86-64** (Windows / Linux x64 / Intel Mac) и **ARM64** (Windows ARM64 / Linux arm64 / Apple Silicon macOS).
 
-#### x86-64 (Intel Mac / Windows / Linux x64)
+Патчер применяет **два гейта** последовательно:
+
+#### Gate 1 — экран «Eligibility Check» (`handleAuthResult`)
+
+##### x86-64
 1. В функции `handleAuthResult` после считывания ответа сервера выполняется проверка массива причин блокировки аккаунта (`ineligibleTiers` по смещению `+0x20`):
    ```asm
    mov rdi, qword ptr [rax+0x20] ; 48 8b 78 20     <-- адрес ineligibleTiers
    test rdi, rdi                 ; 48 85 ff         <-- проверка на NULL (нет причин)
    je  eligible                  ; 74 52            <-- переход к успеху если нет ограничений
    ```
-2. Если `ineligibleTiers != NULL`, программа заходит в цикл сопоставления причин недоступности региона и помечает флаг `ineligible = 1`. Патчер заменяет условный переход `je` (`74 52`) на безусловный `jmp` (`eb 52`). В результате программа **всегда переходит на успешную ветку** (`ineligible = 0`), игнорируя серверный список блокировок региона.
+2. Патчер заменяет условный переход `je` (`74 52`) на безусловный `jmp` (`eb 52`). Программа **всегда переходит на успешную ветку** (`ineligible = 0`).
 
-#### ARM64 (Windows ARM64 / Linux arm64 / Apple Silicon macOS)
+##### ARM64
 1. В функции `handleAuthResult` массив причин `ineligibleTiers` загружается по смещению `+0x18`:
    ```asm
    ldr x20, [x19]       ; 74 02 40 f9
    ldr x24, [x21, #0x18]; b8 0e 40 f9     <-- загрузка ineligibleTiers
-   cbz x24, success_ret ; 78 05 00 b4     <-- переход к успеху при x24 == 0 (нет причин)
+   cbz x24, success_ret ; 78 05 00 b4     <-- переход к успеху при x24 == 0
    ```
-2. Патчер заменяет условный переход `cbz x24, success_ret` (`78 05 00 b4`) на безусловный переход `b success_ret` (`2b 00 00 14`). В результате условная проверка отменяется, и исполнение **принудительно перенаправляется на успешный возврат** (`ineligible = 0`), минуя разбор причин блокировки от сервера. `MultiGate` автоматически выбирает подходящую сигнатуру.
+2. Патчер заменяет `cbz x24, success_ret` на безусловный `b success_ret` (`2b 00 00 14`).
+
+#### Gate 2 — серверная проверка eligibility (`eligibilityErrorFormatter`)
+
+Начиная с agy v1.1.8, Google API (`daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist`) возвращает `ineligibleTiers` в JSON-ответе, и agy форматирует ошибку «Account ineligible: %s» в отдельной функции. Gate 2 предотвращает срабатывание этого форматтера.
+
+##### x86-64
+1. Функция-форматтер проверяет результат авторизации и флаг eligibility:
+   ```asm
+   test rax, rax              ; 48 85 c0         <-- auth-результат == nil?
+   je  eligible               ; 0f 84 xx xx xx xx <-- если nil → GOOD (пропуск ошибки)
+   cmp byte ptr [rax+8], 0   ; 80 78 08 00      <-- проверка флага eligibility
+   jne eligible               ; 0f 85 xx xx xx xx <-- если флаг != 0 → GOOD
+   call fmt.Errorf            ; e8 ...            <-- BAD: создание ошибки "Account ineligible"
+   ```
+2. Патчер заменяет `je` (`0f 84`) на `jmp` (`e9`) с тем же смещением + `nop`. Функция **всегда идёт по GOOD-пути**, не формируя ошибку.
+
+##### ARM64
+1. Эквивалентная проверка на ARM64:
+   ```asm
+   cbz x0, eligible          ; 80 xx xx b4     <-- если x0 == 0 → GOOD
+   ldrb w1, [x0, #8]        ; 01 20 40 39     <-- загрузка флага eligibility
+   tbz w1, #0, eligible     ; 41 xx xx 37     <-- если бит 0 == 0 → GOOD
+   bl  fmt.Errorf            ; xx xx xx 97     <-- BAD: форматтер ошибки
+   ```
+2. Патчер заменяет `cbz x0, eligible` на безусловный `b eligible` (`1a 00 00 14`). Форматтер ошибки никогда не вызывается.
 
 #### Общие шаги
 3. Перед записью создаётся резервная копия `agy.exe.agybak` (или `agy.agybak` на POSIX). Если существующий бэкап устарел (приложение автообновилось), он автоматически обновляется — stale-копии не хранятся.
@@ -284,9 +313,9 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 - Если сигнатура встречается больше одного раза, патчер тоже отказывается («not unique — refusing to guess») — не угадывает, какой сайт править.
 - Откат выполняется через **RESTORE → `6`** (Antigravity CLI) восстановлением из `.agybak`.
 
-> **Примечание по платформам:** сигнатура для x86-64 проверена под Windows и Intel macOS, для ARM64 — под Apple Silicon macOS. Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
+> **Примечание по платформам:** сигнатуры для x86-64 проверены под Windows и Intel macOS, для ARM64 — под Apple Silicon macOS. Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
 
-> **Примечание:** проверка «Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location» выполняется на стороне сервера. Патч снимает только локальный косметический экран «⚠ Eligibility Check» в `handleAuthResult`, но не может обойти серверную проверку доступности региона.
+> **Оба гейта вместе = полный обход.** Gate 1 снимает локальный косметический экран «⚠ Eligibility Check», Gate 2 предотвращает формирование ошибки «Account ineligible» по ответу сервера. Без Gate 1 поток управления не дойдёт до API-вызова; без Gate 2 — серверный ответ `ineligibleTiers` вызовет ошибку.
 
 ## 🔍 Логика поиска файла
 
@@ -394,7 +423,7 @@ xcode-select --install
   - **Windows** — полная поддержка автопоиска через реестр и UAC.
   - **Linux** — автопоиск в `/usr/share/antigravity-ide`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
   - **macOS** — автопоиск в `/Applications/Antigravity IDE.app` и `~/Applications/Antigravity IDE.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
-- **Минимальная версия Antigravity 2.0**: `2.3.1`
+- **Минимальная версия Antigravity 2.0**: `2.4.3`
 - **Минимальная версия Antigravity IDE**: `2.1.1`
 - **Поддерживаемые версии**: `2.3.0` и выше для Antigravity 2.0, `2.1.1` и выше для IDE
 
