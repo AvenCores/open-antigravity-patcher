@@ -119,9 +119,19 @@ ELIGIBILITY_GATE_X64 = Gate(
     offset=3,
     desc="server eligibility bypass (x64)",
 )
+# arm64: cbz x0,eligible; ldrb w1,[x0,#8]; tbz w1,#0,eligible; bl fmt.Errorf
+# → patch cbz→b (всегда GOOD-path)
+ELIGIBILITY_GATE_ARM64 = Gate(
+    rb"\x80..\xb4\x01\x20\x40\x39\x41..\x37",
+    rb"\x1a\x00\x00\x14\x01\x20\x40\x39\x41..\x37",
+    b"\x1a\x00\x00\x14",
+    offset=0,
+    desc="server eligibility bypass (arm64)",
+)
 
 ELIGIBILITY_GATE = MultiGate(
     ELIGIBILITY_GATE_X64,
+    ELIGIBILITY_GATE_ARM64,
     desc="server eligibility bypass",
 )
 
