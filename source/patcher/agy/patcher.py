@@ -1,7 +1,6 @@
 import os
 import re
 import mmap
-import struct
 import shutil
 import contextlib
 import filecmp
@@ -84,30 +83,27 @@ class MultiGate:
 
 
 # ---------------------------------------------------------------------------
-# Gate 1: CLI eligibility screen.
+# Gate 1: CLI eligibility screen (единственный гейт начальной проверки).
 # x64:
-#   test rax,rax ; je ; cmp byte[rax+8],0 ; jne eligible ; call failure builder
+#   test rax,rax ; je eligible ; cmp byte[rax+8],0 ; jne eligible ; call failure_builder
 # Repeating the non-null test keeps ZF=0, so jne always selects eligible.
+# Сигнатура ограничена 16-байтным ядром проверки: хвост (call + register spills)
+# варьируется между сборками, поэтому в паттерн не включается.
 CLI_GATE_X64 = Gate(
-    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85...."
-    rb"\xe8....\x48\x89\x44\x24\x78\x48\x89\x5c\x24\x48"
-    rb"\x48\x89\x4c\x24\x68",
-    rb"\x48\x85\xc0\x0f\x84....\x48\x85\xc0\x90\x0f\x85...."
-    rb"\xe8....\x48\x89\x44\x24\x78\x48\x89\x5c\x24\x48"
-    rb"\x48\x89\x4c\x24\x68",
+    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85....",
+    rb"\x48\x85\xc0\x0f\x84....\x48\x85\xc0\x90\x0f\x85....",
     b"\x48\x85\xc0\x90",
     offset=9,
     desc="eligibility screen off (x64)",
 )
 # arm64:
 #   cbnz x1,error ; cbz x0,eligible ; ldrb w1,[x0,#8] ; tbnz w1,#0,eligible
-#   bl failure builder
+#   bl failure_builder
 # Loading 1 instead makes tbnz always select eligible.
+# Хвост (bl + stores) варьируется — в паттерн не включается.
 CLI_GATE_ARM64 = Gate(
-    rb"...\xb5...\xb4\x01\x20\x40\x39...\x37...\x97"
-    rb"\xe0\x43\x00\xf9\xe1\x2b\x00\xf9\xe2\x3b\x00\xf9",
-    rb"...\xb5...\xb4\x21\x00\x80\x52...\x37...\x97"
-    rb"\xe0\x43\x00\xf9\xe1\x2b\x00\xf9\xe2\x3b\x00\xf9",
+    rb"...\xb5...\xb4\x01\x20\x40\x39...\x37",
+    rb"...\xb5...\xb4\x21\x00\x80\x52...\x37",
     b"\x21\x00\x80\x52",
     offset=8,
     desc="eligibility screen off (arm64)",
@@ -119,35 +115,8 @@ CLI_GATE = MultiGate(
     desc="eligibility screen off",
 )
 
-# ---------------------------------------------------------------------------
-# Gate 2 (eligibilityErrorFormatter): обход серверной проверки eligibility.
-# amd64: test rax,rax; je eligible → patch je→jmp (всегда GOOD-path)
-ELIGIBILITY_GATE_X64 = Gate(
-    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85....\xe8",
-    rb"\x48\x85\xc0\xe9....\x90\x80\x78\x08\x00\x0f\x85....\xe8",
-    b"\xe9\xf7\x01\x00\x00\x90",
-    offset=3,
-    desc="server eligibility bypass (x64)",
-)
-# arm64: cbz x0,eligible; ldrb w1,[x0,#8]; tbz w1,#0,eligible; bl fmt.Errorf
-# → patch cbz→b (всегда GOOD-path)
-ELIGIBILITY_GATE_ARM64 = Gate(
-    rb"\x80..\xb4\x01\x20\x40\x39\x41..\x37",
-    rb"\x1a\x00\x00\x14\x01\x20\x40\x39\x41..\x37",
-    b"\x1a\x00\x00\x14",
-    offset=0,
-    desc="server eligibility bypass (arm64)",
-)
-
-ELIGIBILITY_GATE = MultiGate(
-    ELIGIBILITY_GATE_X64,
-    ELIGIBILITY_GATE_ARM64,
-    desc="server eligibility bypass",
-)
-
 ALL_GATES = [
     (CLI_GATE, "eligibility screen off"),
-    (ELIGIBILITY_GATE, "server eligibility bypass"),
 ]
 
 

@@ -109,7 +109,7 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 ## 🌟 Возможности
 - Автоматический поиск установленного Antigravity 2.0, Antigravity IDE и Antigravity CLI (`agy`) в стандартных путях и реестре Windows.
 - **Проверка обновлений** — автоматическая проверка новых версий при запуске и ручная проверка через меню (TOOLS → `7`).
-- **Патч Antigravity CLI** — снятие экрана «Eligibility Check» и обход серверной проверки eligibility (Gate 1 + Gate 2) в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
+- **Патч Antigravity CLI** — снятие экрана «Eligibility Check» и обход проверки eligibility в Go-бинаре `agy`/`agy.exe` на уровне машинного кода по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
 - **Патч Antigravity Manager (`language_server`)** — снятие проверки авторизации (`hasValidAuth=true`) в скомпилированном бинарнике бэкенда по байтовой сигнатуре для архитектур x86-64 и ARM64 (с резервной копией и откатом).
 - Поддержка Linux: поиск по `/usr/share/antigravity-ide`, определение версии через `dpkg`, `rpm` и `package.json`.
 - Поддержка macOS: поиск `.app`-бандла в `/Applications` и `~/Applications`, ad-hoc переподпись после изменения `main.js`.
@@ -257,7 +257,7 @@ Antigravity Manager (`language_server` или `language_server.exe`) — бэк�
 
 Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, `agy` на Linux/macOS), который показывает косметический экран «Eligibility Check» и формирует ошибку «Account ineligible» по ответу сервера. Поскольку это скомпилированный бинарь (не JS), патчинг выполняется **на уровне машинного кода** по уникальной байтовой сигнатуре под две архитектуры через `MultiGate`: **x86-64** (Windows / Linux x64 / Intel Mac) и **ARM64** (Windows ARM64 / Linux arm64 / Apple Silicon macOS).
 
-Патчер применяет **два гейта** последовательно:
+Патчер применяет **один гейт** — внешняя проверка перед построением ошибки делает ветку ошибки недостижимой:
 
 #### Gate 1 — экран «Eligibility Check»
 
@@ -283,31 +283,6 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
    ```
 2. Патчер заменяет загрузку флага `ldrb w1,[x0,#8]` на `mov w1,#1` (`21 00 80 52`), поэтому существующий `tbnz` всегда выбирает ветку «eligible». `MultiGate` автоматически выбирает x64- или arm64-сигнатуру.
 
-#### Gate 2 — серверная проверка eligibility (`eligibilityErrorFormatter`)
-
-Начиная с agy v1.1.8, Google API (`daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist`) возвращает `ineligibleTiers` в JSON-ответе, и agy форматирует ошибку «Account ineligible: %s» в отдельной функции. Gate 2 предотвращает срабатывание этого форматтера.
-
-##### x86-64
-1. Функция-форматтер проверяет результат авторизации и флаг eligibility:
-   ```asm
-   test rax, rax              ; 48 85 c0         <-- auth-результат == nil?
-   je  eligible               ; 0f 84 xx xx xx xx <-- если nil → GOOD (пропуск ошибки)
-   cmp byte ptr [rax+8], 0   ; 80 78 08 00      <-- проверка флага eligibility
-   jne eligible               ; 0f 85 xx xx xx xx <-- если флаг != 0 → GOOD
-   call fmt.Errorf            ; e8 ...            <-- BAD: создание ошибки "Account ineligible"
-   ```
-2. Патчер заменяет `je` (`0f 84`) на `jmp` (`e9`) с тем же смещением + `nop`. Функция **всегда идёт по GOOD-пути**, не формируя ошибку.
-
-##### ARM64
-1. Эквивалентная проверка на ARM64:
-   ```asm
-   cbz x0, eligible          ; 80 xx xx b4     <-- если x0 == 0 → GOOD
-   ldrb w1, [x0, #8]        ; 01 20 40 39     <-- загрузка флага eligibility
-   tbz w1, #0, eligible     ; 41 xx xx 37     <-- если бит 0 == 0 → GOOD
-   bl  fmt.Errorf            ; xx xx xx 97     <-- BAD: форматтер ошибки
-   ```
-2. Патчер заменяет `cbz x0, eligible` на безусловный `b eligible` (`1a 00 00 14`). Форматтер ошибки никогда не вызывается.
-
 #### Общие шаги
 3. Перед записью создаётся резервная копия `agy.exe.agybak` (или `agy.agybak` на POSIX). Если существующий бэкап устарел (приложение автообновилось), он автоматически обновляется — stale-копии не хранятся.
 4. На macOS после модификации бинарь переподписывается ad-hoc (как и в случае с `.app`).
@@ -318,8 +293,6 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 - Откат выполняется через **RESTORE → `6`** (Antigravity CLI) восстановлением из `.agybak`.
 
 > **Примечание по платформам:** сигнатуры для x86-64 проверены под Windows и Intel macOS, для ARM64 — под Apple Silicon macOS. Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
-
-> **Оба гейта вместе = полный обход.** Gate 1 снимает локальный косметический экран «⚠ Eligibility Check», Gate 2 предотвращает формирование ошибки «Account ineligible» по ответу сервера. Без Gate 1 поток управления не дойдёт до API-вызова; без Gate 2 — серверный ответ `ineligibleTiers` вызовет ошибку.
 
 ## 🔍 Логика поиска файла
 
