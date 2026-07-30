@@ -259,25 +259,29 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 
 Патчер применяет **два гейта** последовательно:
 
-#### Gate 1 — экран «Eligibility Check» (`handleAuthResult`)
+#### Gate 1 — экран «Eligibility Check»
 
 ##### x86-64
-1. В функции `handleAuthResult` после считывания ответа сервера выполняется проверка массива причин блокировки аккаунта (`ineligibleTiers` по смещению `+0x20`):
+1. Патчер сканирует бинарник в поисках уникальной сигнатуры проверки гейта:
    ```asm
-   mov rdi, qword ptr [rax+0x20] ; 48 8b 78 20     <-- адрес ineligibleTiers
-   test rdi, rdi                 ; 48 85 ff         <-- проверка на NULL (нет причин)
-   je  eligible                  ; 74 52            <-- переход к успеху если нет ограничений
+   test rax, rax              ; 48 85 c0            <-- auth-результат == nil?
+   je  eligible               ; 0f 84 xx xx xx xx   <-- если nil → GOOD
+   cmp byte ptr [rax+8], 0   ; 80 78 08 00         <-- проверка флага eligibility
+   jne eligible               ; 0f 85 xx xx xx xx   <-- если флаг != 0 → GOOD
+   call failure_builder       ; e8 xx xx xx xx      <-- BAD: построение ошибки
    ```
-2. Патчер заменяет условный переход `je` (`74 52`) на безусловный `jmp` (`eb 52`). Программа **всегда переходит на успешную ветку** (`ineligible = 0`).
+2. Патчер заменяет `cmp byte ptr [rax+8], 0` на `test rax,rax` + `NOP` (`48 85 c0 90`). Так как `rax` здесь гарантированно не равен нулю, переход `jne` всегда уводит выполнение в ветку «eligible».
 
 ##### ARM64
-1. В функции `handleAuthResult` массив причин `ineligibleTiers` загружается по смещению `+0x18`:
+1. В актуальных нативных arm64-сборках внешняя проверка перед построением ошибки выглядит как:
    ```asm
-   ldr x20, [x19]       ; 74 02 40 f9
-   ldr x24, [x21, #0x18]; b8 0e 40 f9     <-- загрузка ineligibleTiers
-   cbz x24, success_ret ; 78 05 00 b4     <-- переход к успеху при x24 == 0
+   cbnz x1, error            ; xx xx xx b5     <-- если x1 != 0 → BAD
+   cbz  x0, eligible         ; xx xx xx b4     <-- если x0 == 0 → GOOD
+   ldrb w1, [x0, #8]        ; 01 20 40 39     <-- загрузка флага eligibility
+   tbnz w1, #0, eligible    ; xx xx xx 37     <-- если бит 0 != 0 → GOOD
+   bl   failure_builder      ; xx xx xx 97     <-- BAD: построение ошибки
    ```
-2. Патчер заменяет `cbz x24, success_ret` на безусловный `b success_ret` (`2b 00 00 14`).
+2. Патчер заменяет загрузку флага `ldrb w1,[x0,#8]` на `mov w1,#1` (`21 00 80 52`), поэтому существующий `tbnz` всегда выбирает ветку «eligible». `MultiGate` автоматически выбирает x64- или arm64-сигнатуру.
 
 #### Gate 2 — серверная проверка eligibility (`eligibilityErrorFormatter`)
 

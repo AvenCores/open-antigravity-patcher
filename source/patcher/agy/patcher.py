@@ -84,35 +84,37 @@ class MultiGate:
 
 
 # ---------------------------------------------------------------------------
-# Gate 1 (handleAuthResult): cosmetic "Eligibility Check" screen.
-# amd64 (Win/Mac): mov rdi,[rax+0x20]; test rdi,rdi; je eligible → patch je→jmp
+# Gate 1: CLI eligibility screen.
+# x64:
+#   test rax,rax ; je ; cmp byte[rax+8],0 ; jne eligible ; call failure builder
+# Repeating the non-null test keeps ZF=0, so jne always selects eligible.
 CLI_GATE_X64 = Gate(
-    rb"\x48\x8b\x78\x20\x48\x85\xff\x74\x52",
-    rb"\x48\x8b\x78\x20\x48\x85\xff\xeb\x52",
-    b"\xeb",
-    offset=7,
+    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85...."
+    rb"\xe8....\x48\x89\x44\x24\x78\x48\x89\x5c\x24\x48"
+    rb"\x48\x89\x4c\x24\x68",
+    rb"\x48\x85\xc0\x0f\x84....\x48\x85\xc0\x90\x0f\x85...."
+    rb"\xe8....\x48\x89\x44\x24\x78\x48\x89\x5c\x24\x48"
+    rb"\x48\x89\x4c\x24\x68",
+    b"\x48\x85\xc0\x90",
+    offset=9,
     desc="eligibility screen off (x64)",
 )
-# amd64 (Linux): то же, но je near (0f 84 rel32) + Go дублирует функцию
-CLI_GATE_X64_LINUX = Gate(
-    rb"\x48\x8b\x78\x20\x48\x85\xff\x0f\x84....\x48\x89\x74\x24\x58",
-    rb"\x48\x8b\x78\x20\x48\x85\xff\xe9....\x48\x89\x74\x24\x58",
-    b"\xe9\x22\x01\x00\x00",
-    offset=7,
-    desc="eligibility screen off (x64/linux)",
-)
-# arm64: ldr x20,[x19]; ldr x24,[x21,#0x18]; cbz x24,success → patch cbz→b
+# arm64:
+#   cbnz x1,error ; cbz x0,eligible ; ldrb w1,[x0,#8] ; tbnz w1,#0,eligible
+#   bl failure builder
+# Loading 1 instead makes tbnz always select eligible.
 CLI_GATE_ARM64 = Gate(
-    rb"\x74\x02\x40\xf9\xb8\x0e\x40\xf9\x78\x05\x00\xb4",
-    rb"\x74\x02\x40\xf9\xb8\x0e\x40\xf9\x2b\x00\x00\x14",
-    b"\x2b\x00\x00\x14",
+    rb"...\xb5...\xb4\x01\x20\x40\x39...\x37...\x97"
+    rb"\xe0\x43\x00\xf9\xe1\x2b\x00\xf9\xe2\x3b\x00\xf9",
+    rb"...\xb5...\xb4\x21\x00\x80\x52...\x37...\x97"
+    rb"\xe0\x43\x00\xf9\xe1\x2b\x00\xf9\xe2\x3b\x00\xf9",
+    b"\x21\x00\x80\x52",
     offset=8,
     desc="eligibility screen off (arm64)",
 )
 
 CLI_GATE = MultiGate(
     CLI_GATE_X64,
-    CLI_GATE_X64_LINUX,
     CLI_GATE_ARM64,
     desc="eligibility screen off",
 )
