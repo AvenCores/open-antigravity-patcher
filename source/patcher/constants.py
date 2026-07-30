@@ -1,4 +1,4 @@
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 MIN_AG_VERSION = "2.1.1"
 MIN_ANTIGRAVITY_VERSION = "2.4.3"
 DOWNLOAD_URL = "https://antigravity.google/download"
