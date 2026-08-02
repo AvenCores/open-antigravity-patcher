@@ -62,13 +62,22 @@ def _ide_cache_dirs():
 def apply_patches(content, ag_version=None):
     """Применяет патч isGoogleInternal для IDE из manager.py."""
     results = []
+    already = is_already_patched(content)
     matches = [m.group(0) for m in IDE_RE.finditer(content)]
     new_content = IDE_RE.sub(r"\1true", content)
     applied = new_content != content
+
+    if applied:
+        detail = f"replaced {len(matches)} occurrences"
+    elif already:
+        detail = "already patched"
+    else:
+        detail = "pattern not found"
+
     results.append({
         "Name": "isGoogleInternal -> true (auth)",
-        "Applied": applied,
-        "Detail": f"replaced {len(matches)} occurrences" if applied else "pattern not found",
+        "Applied": True if (applied or already) else False,
+        "Detail": detail,
     })
     return new_content, results
 
@@ -209,6 +218,10 @@ def do_patch(main_js_path, show_search_line=False):
             applied += 1
         step(r["Name"], r.get("Applied", False), r.get("Detail", ""))
     print()
+
+    if new_content == content and current_is_patched:
+        ok("File is already patched — no changes needed.")
+        return
 
     if applied == 0:
         err("No patches applied.")
