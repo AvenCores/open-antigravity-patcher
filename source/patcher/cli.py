@@ -9,7 +9,9 @@ from patcher.constants import (
     COLOR_YELLOW,
     COLOR_RED,
     COLOR_BOLD,
+    COLOR_WHITE,
     DOWNLOAD_URL,
+    VERSION,
 )
 from patcher.utils.console import (
     color,
@@ -234,6 +236,37 @@ def print_target_info(main_js_path, manager_path="", agy_path="", show_search_li
         _kv("Status:", "not found", COLOR_YELLOW)
 
 
+def show_about():
+    clear_screen()
+    print_banner()
+    print_menu_section("ABOUT OPEN AG PATCHER")
+    print()
+    print(f"  {color('Open AG Patcher', COLOR_BOLD, COLOR_CYAN)} v{VERSION}")
+    print("  Open-source region lock bypass tool for Antigravity products:")
+    print("  Antigravity IDE, Antigravity 2.0 (language_server), and Antigravity CLI (agy).")
+    print("  Allows using Antigravity without VPN or changing Google account region.")
+    print()
+    hint("Features:")
+    print(f"   • {color('Antigravity IDE patch', COLOR_GREEN)} — main.js isGoogleInternal bypass")
+    print(f"   • {color('Antigravity 2.0 patch', COLOR_GREEN)} — language_server binary patch")
+    print(f"   • {color('Antigravity CLI patch', COLOR_GREEN)} — agy eligibility check bypass")
+    print(f"   • {color('Backup & Restore', COLOR_GREEN)}     — safe, fully reversible modifications")
+    print()
+    hint("Author & Community:")
+    print(f"   • Author:   {color('AvenCores', COLOR_YELLOW)}")
+    print(f"   • Telegram: {color('t.me/avencoresyt', COLOR_CYAN)} (Chat: {color('t.me/avencoreschat', COLOR_CYAN)})")
+    print(f"   • YouTube:  {color('youtube.com/@avencores', COLOR_CYAN)}")
+    print(f"   • VK:       {color('vk.ru/avencoresreuploads', COLOR_CYAN)}")
+    print(f"   • Dzen:     {color('dzen.ru/avencores', COLOR_CYAN)}")
+    print()
+    hint("Support Author:")
+    print(f"   • {color('SBER:', COLOR_GREEN)} {color('2202 2050 1464 4675', COLOR_BOLD, COLOR_WHITE)}")
+    print()
+    hint("License:")
+    print(f"   • GPL-3.0 License (Attribution: eligibility-antigravity-patcher / MIT)")
+    print()
+
+
 def redraw_main_screen(main_js_path, manager_path="", agy_path="", show_search_line=False):
     clear_screen()
     print_banner()
@@ -348,6 +381,7 @@ def run_cli():
         print_menu_row("7", "Check for updates", "check GitHub releases", COLOR_CYAN)
         print_menu_row("8", "Open GitHub repository", "source & updates", COLOR_CYAN)
         print_menu_row("9", "Select custom path", "override auto-detected target", COLOR_CYAN)
+        print_menu_row("10", "About program", "information & author links", COLOR_CYAN)
 
         print()
         print_menu_row("0", "Exit", "quit the patcher", COLOR_RED)
@@ -364,7 +398,7 @@ def run_cli():
             redraw_main_screen(main_js_path, manager_path, agy_path, show_search_line=searched)
             continue
 
-        valid_choices = {str(i) for i in range(1, 10)}
+        valid_choices = {str(i) for i in range(1, 11)}
         if choice not in valid_choices:
             err("Invalid choice")
             print()
@@ -493,6 +527,8 @@ def run_cli():
                              err("Could not resolve a valid Antigravity CLI target.")
                      pause()
             handled = True
+        elif choice == "10":
+            show_about()
 
         print()
 
