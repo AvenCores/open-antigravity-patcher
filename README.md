@@ -249,7 +249,7 @@ Antigravity Manager (`language_server` или `language_server.exe`) — бэк�
 
 Патчер вносит изменения непосредственно в скомпилированный бинарный файл `language_server` по байтовой сигнатуре для двух архитектур через класс `MultiGate`:
 - **x86-64** (Intel Mac / Windows / Linux x64): Находит и заменяет проверку `cmp byte ptr [rax + 8], 0` на `mov byte ptr [rax + 8], 1` с последующими `nop` (`\xc6\x40\x08\x01\x90\x90`).
-- **ARM64** (Linux arm64 / Apple Silicon macOS): Находит и заменяет последовательность `ldrb w3, [x0, #8] ; tbz w3, #0, skip` на `mov w3, #1 ; strb w3, [x0, #8]` (`\x23\x00\x80\x52\x03\x20\x00\x39`).
+- **ARM64** (Linux arm64 / Apple Silicon macOS): Находит и заменяет последовательность `ldrb w3, [x0, #8] ; tbz w3, #0, skip` (с учётом одной или двух инструкций подготовки) на `mov w3, #1 ; strb w3, [x0, #8]` (`\x23\x00\x80\x52\x03\x20\x00\x39`).
 
 В результате возвращаемое значение `hasValidAuth` всегда принудительно выставляется в `true`, снимая блокировку.
 Патч обратим через **RESTORE → `5`** восстановлением оригинального бинарника из `.agybak`.
@@ -401,7 +401,7 @@ xcode-select --install
   - **Windows** — полная поддержка автопоиска через реестр и UAC.
   - **Linux** — автопоиск в `/usr/share/antigravity-ide`, определение версии через `dpkg`/`rpm`/`package.json`, sudo-повышение.
   - **macOS** — автопоиск в `/Applications/Antigravity IDE.app` и `~/Applications/Antigravity IDE.app`, определение версии через `package.json`, ad-hoc переподпись через `codesign` (Xcode Command Line Tools).
-- **Минимальная версия Antigravity 2.0**: `2.4.3`
+- **Минимальная версия Antigravity 2.0**: `2.5.0`
 - **Минимальная версия Antigravity IDE**: `2.1.1`
 - **Поддерживаемые версии**: `2.3.0` и выше для Antigravity 2.0, `2.1.1` и выше для IDE
 

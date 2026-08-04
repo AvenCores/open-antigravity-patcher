@@ -98,9 +98,15 @@ MANAGER_GATE_X64 = Gate(
     desc="hasValidAuth=true (x64)",
 )
 
+# arm64: force hasValidAuth and remove the token-attachment branch.
+#   ldrb w3,[x0,#8] ; tbz w3,#0,skip  ->  mov w3,#1 ; strb w3,[x0,#8]
+# The branch displacement spans the low byte, so accept every encoding that keeps
+# Rt=w3. Builds use either one or two setup instructions before the token stp.
+_ARM64_TBZ_W3_BIT0 = rb"[\x03\x23\x43\x63\x83\xa3\xc3\xe3]..\x36"
+_ARM64_TOKEN_SETUP = rb"(?:....){1,2}\x03\x10\x06\xa9"
 MANAGER_GATE_ARM64 = Gate(
-    rb"\x03\x20\x40\x39\xc3..\x36........\x03\x10\x06\xa9",
-    rb"\x23\x00\x80\x52\x03\x20\x00\x39........\x03\x10\x06\xa9",
+    rb"\x03\x20\x40\x39" + _ARM64_TBZ_W3_BIT0 + _ARM64_TOKEN_SETUP,
+    rb"\x23\x00\x80\x52\x03\x20\x00\x39" + _ARM64_TOKEN_SETUP,
     b"\x23\x00\x80\x52\x03\x20\x00\x39",
     offset=0,
     desc="hasValidAuth=true (arm64)",
