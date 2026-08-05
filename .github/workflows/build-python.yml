@@ -138,35 +138,43 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Linux ARM64 — via QEMU emulation
+  # Linux ARM64 — native ubuntu-24.04-arm runner
   # ─────────────────────────────────────────────────────────────────────────────
   build-linux-arm64:
     name: Build Linux (ARM64)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
-          platforms: arm64
+          python-version: '3.x'
 
-      - name: Build inside ARM64 container
-        uses: docker/build-push-action@v7
-        with:
-          context: source
-          file: .github/.github-docker/Dockerfile.linux-arm64
-          platforms: linux/arm64
-          push: false
-          outputs: type=local,dest=source/dist-arm64
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: source
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller --onefile
+          --icon=icon.ico
+          --name="Open_AG_Patcher_Linux_arm64"
+          --hidden-import=packaging
+          --hidden-import=packaging.version
+          --hidden-import=packaging.specifiers
+          --hidden-import=packaging.requirements
+          --clean
+          main.py
+        working-directory: source
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: python-linux-arm64
-          path: source/dist-arm64/Open_AG_Patcher_Linux_arm64
+          path: source/dist/Open_AG_Patcher_Linux_arm64
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────────
