@@ -306,7 +306,7 @@ def show_about():
     print()
     hint("License:")
     print(f"   • GPL-3.0 License (Attribution: {attr_link} / MIT)")
-    print()
+
 
 
 def redraw_main_screen(main_js_path, manager_path="", agy_path="", show_search_line=False):
