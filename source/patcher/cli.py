@@ -540,6 +540,7 @@ def run_cli():
                                  err("Could not resolve a valid Antigravity IDE target (main.js not found).")
                          else:
                              err("Path does not exist.")
+                     print()
                      pause()
                 elif sub_choice == "2":
                      print()
@@ -554,6 +555,7 @@ def run_cli():
                              ok("Antigravity 2.0 path updated!")
                          else:
                              err("Could not resolve a valid Antigravity 2.0 target (language_server not found).")
+                     print()
                      pause()
                 elif sub_choice == "3":
                      print()
@@ -568,6 +570,7 @@ def run_cli():
                              ok("Antigravity CLI path updated!")
                          else:
                              err("Could not resolve a valid Antigravity CLI target.")
+                     print()
                      pause()
             handled = True
         elif choice == "10":
