@@ -9,6 +9,7 @@ from patcher.constants import (
     COLOR_YELLOW,
     COLOR_RED,
     COLOR_BOLD,
+    COLOR_DIM,
     COLOR_WHITE,
     COLOR_UNDERLINE,
     DOWNLOAD_URL,
@@ -48,8 +49,37 @@ from patcher.manager.discovery import find_manager_binary, resolve_manager_path,
 from patcher.manager.patcher import is_already_patched as is_mgr_patched, do_patch_manager, do_restore_manager
 
 
-def pause():
-    input("  Press Enter to return to menu...")
+def pause(prompt="  Press Enter to return to menu..."):
+    print(color(prompt, COLOR_DIM), end="", flush=True)
+    if os.name == "nt":
+        import msvcrt
+        try:
+            while msvcrt.kbhit():
+                msvcrt.getch()
+            while True:
+                ch = msvcrt.getch()
+                if ch in (b"\r", b"\n"):
+                    break
+        except Exception:
+            input()
+    else:
+        try:
+            import tty
+            import termios
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                while True:
+                    ch = sys.stdin.read(1)
+                    if ch in ("\r", "\n"):
+                        break
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        except Exception:
+            input()
+    print()
+
 
 
 def print_launch_examples():
