@@ -1,9 +1,10 @@
 import os
 import sys
 import ctypes
+import re
 from patcher.constants import (
     VERSION, COLOR_RESET, COLOR_CYAN, COLOR_GREEN, COLOR_YELLOW, COLOR_RED,
-    COLOR_BOLD, COLOR_DIM, COLOR_GRAY, COLOR_WHITE,
+    COLOR_BOLD, COLOR_DIM, COLOR_GRAY, COLOR_WHITE, COLOR_UNDERLINE,
 )
 
 USE_COLOR = False
@@ -49,6 +50,16 @@ def color(text, *styles):
     return "".join(styles) + text + COLOR_RESET
 
 
+def link(url, text=None, *styles):
+    """Format text as an ANSI OSC 8 terminal hyperlink with optional styling."""
+    if text is None:
+        text = url
+    styled_text = color(text, *styles) if styles else text
+    if not USE_COLOR:
+        return text
+    return f"\x1b]8;;{url}\x1b\\{styled_text}\x1b]8;;\x1b\\"
+
+
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
@@ -61,21 +72,14 @@ MENU_WIDTH = BANNER_INNER_WIDTH + 2
 
 
 def _visible_len(text):
-    """Return visible text length without ANSI color escapes."""
-    if "\x1b[" not in text:
+    """Return visible text length without ANSI escape codes (color/link)."""
+    if "\x1b" not in text:
         return len(text)
-    out = []
-    in_code = False
-    for ch in text:
-        if ch == "\x1b":
-            in_code = True
-            continue
-        if in_code:
-            if ch == "m":
-                in_code = False
-            continue
-        out.append(ch)
-    return len(out)
+    clean = re.sub(r'\x1b\]8;;.*?(?:\x1b\\|\x07)', '', text)
+    clean = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', clean)
+    return len(clean)
+
+
 
 
 # Shared frame helpers for the banner and operation summary panels.
@@ -106,8 +110,9 @@ def print_banner():
     title_right = color(f"v{VERSION}", COLOR_GREEN, COLOR_BOLD)
 
     label_col = 12  # ширина колонки подписей (Telegram/YouTube) для ровной сетки
-    telegram = color("Telegram".ljust(label_col), COLOR_YELLOW) + color("t.me/avencoresyt", COLOR_DIM)
-    youtube = color("YouTube".ljust(label_col), COLOR_YELLOW) + color("youtube.com/@avencores", COLOR_DIM)
+    telegram = color("Telegram".ljust(label_col), COLOR_YELLOW) + link("https://t.me/avencoresyt", "t.me/avencoresyt", COLOR_DIM, COLOR_UNDERLINE)
+    youtube = color("YouTube".ljust(label_col), COLOR_YELLOW) + link("https://youtube.com/@avencores", "youtube.com/@avencores", COLOR_DIM, COLOR_UNDERLINE)
+
 
     print()
     print(f"  {_frame_border('╔', '═', '╗')}")
@@ -118,6 +123,7 @@ def print_banner():
     print(f"  {_frame_row(telegram)}")
     print(f"  {_frame_row(youtube)}")
     print(f"  {_frame_border('╚', '═', '╝')}")
+
     print()
 
 

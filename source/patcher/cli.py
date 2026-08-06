@@ -10,15 +10,18 @@ from patcher.constants import (
     COLOR_RED,
     COLOR_BOLD,
     COLOR_WHITE,
+    COLOR_UNDERLINE,
     DOWNLOAD_URL,
     VERSION,
 )
 from patcher.utils.console import (
     color,
+    link,
     clear_screen,
     print_banner,
     print_menu_section,
     print_menu_row,
+    print_menu_divider,
     print_menu_footer,
     info,
     hint,
@@ -27,6 +30,7 @@ from patcher.utils.console import (
     err,
     cancel,
 )
+
 from patcher.utils.file import file_size, format_bytes
 from patcher.utils.update import check_for_updates, open_releases_page, print_update_status_notice
 
@@ -253,21 +257,30 @@ def show_about():
     print(f"   • {color('Backup & Restore', COLOR_GREEN)}     — safe, fully reversible modifications")
     print()
     hint("Author & Community:")
+    tg_main = link("https://t.me/avencoresyt", "t.me/avencoresyt", COLOR_CYAN, COLOR_UNDERLINE)
+    tg_chat = link("https://t.me/avencoreschat", "t.me/avencoreschat", COLOR_CYAN, COLOR_UNDERLINE)
+    yt = link("https://youtube.com/@avencores", "youtube.com/@avencores", COLOR_CYAN, COLOR_UNDERLINE)
+    vk = link("https://vk.ru/avencoresreuploads", "vk.ru/avencoresreuploads", COLOR_CYAN, COLOR_UNDERLINE)
+    dz = link("https://dzen.ru/avencores", "dzen.ru/avencores", COLOR_CYAN, COLOR_UNDERLINE)
+    card_num = link("data:text/plain;charset=utf-8,2202%202050%201464%204675", "2202 2050 1464 4675", COLOR_BOLD, COLOR_WHITE, COLOR_UNDERLINE)
+    attr_link = link("https://github.com/QNIX-Dev/eligibility-antigravity-patcher", "eligibility-antigravity-patcher", COLOR_CYAN, COLOR_UNDERLINE)
+
     print(f"   • Author:   {color('AvenCores', COLOR_YELLOW)}")
-    print(f"   • Telegram: {color('t.me/avencoresyt', COLOR_CYAN)} (Chat: {color('t.me/avencoreschat', COLOR_CYAN)})")
-    print(f"   • YouTube:  {color('youtube.com/@avencores', COLOR_CYAN)}")
-    print(f"   • VK:       {color('vk.ru/avencoresreuploads', COLOR_CYAN)}")
-    print(f"   • Dzen:     {color('dzen.ru/avencores', COLOR_CYAN)}")
+    print(f"   • Telegram: {tg_main} (Chat: {tg_chat})")
+    print(f"   • YouTube:  {yt}")
+    print(f"   • VK:       {vk}")
+    print(f"   • Dzen:     {dz}")
     print()
     hint("Support Author:")
-    print(f"   • {color('SBER:', COLOR_GREEN)} {color('2202 2050 1464 4675', COLOR_BOLD, COLOR_WHITE)}")
+    print(f"   • {color('SBER:', COLOR_GREEN)} {card_num}")
     print()
     hint("License:")
-    print(f"   • GPL-3.0 License (Attribution: eligibility-antigravity-patcher / MIT)")
+    print(f"   • GPL-3.0 License (Attribution: {attr_link} / MIT)")
     print()
 
 
 def redraw_main_screen(main_js_path, manager_path="", agy_path="", show_search_line=False):
+
     clear_screen()
     print_banner()
     print_target_info(main_js_path, manager_path, agy_path, show_search_line=show_search_line)
