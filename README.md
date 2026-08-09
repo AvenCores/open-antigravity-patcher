@@ -14,6 +14,9 @@
 </div>
 
 # 🔑 Open AG Patcher
+
+**Languages:** [فارسی](README.fa.md)
+
 <p align="center">
   <a href="https://github.com/AvenCores/open-antigravity-patcher"><img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="Python"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge" alt="GPL-3.0 License"></a>
@@ -290,7 +293,7 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 
 **Безопасность патча:**
 - Если байтовая сигнатура не найдена в бинаре (неизвестная/неподдерживаемая версия), патчер **отказывается патчить** и ничего не меняет — выводится «signature not found (unsupported version?)».
-- Если сигнатура встречается несколько раз (Go может компилировать одну функцию в нескольких экземплярах), патчер применяет фикс ко **всем** вхождениям — они идентичны на уровне машинного кода.
+- Для x86-64 патчер изменяет только вызывающий гейт, который формирует `Eligibility check failed`. Похожая проверка в функции детализации ошибок намеренно не патчится, чтобы не ломать сценарий logout/login и переключение аккаунта.
 - Откат выполняется через **RESTORE → `6`** (Antigravity CLI) восстановлением из `.agybak`.
 
 > **Примечание по платформам:** сигнатуры для x86-64 проверены под Windows и Intel macOS, для ARM64 — под Apple Silicon macOS. Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.

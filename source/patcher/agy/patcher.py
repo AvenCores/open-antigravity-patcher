@@ -86,12 +86,13 @@ class MultiGate:
 # Gate 1: CLI eligibility screen (единственный гейт начальной проверки).
 # x64:
 #   test rax,rax ; je eligible ; cmp byte[rax+8],0 ; jne eligible ; call failure_builder
-# Repeating the non-null test keeps ZF=0, so jne always selects eligible.
-# Сигнатура ограничена 16-байтным ядром проверки: хвост (call + register spills)
-# варьируется между сборками, поэтому в паттерн не включается.
+# Повторный test non-null значения оставляет ZF=0, поэтому jne всегда ведёт
+# в ветку eligible.
+# Патчим вызывающий гейт, который формирует "Eligibility check failed", а не
+# leaf-функцию детализации ошибок для logout/login и переключения аккаунта.
 CLI_GATE_X64 = Gate(
-    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85....",
-    rb"\x48\x85\xc0\x0f\x84....\x48\x85\xc0\x90\x0f\x85....",
+    rb"\x48\x85\xc0\x0f\x84....\x80\x78\x08\x00\x0f\x85....\xe8....\x48\x89\x84\x24\x80\x00\x00\x00",
+    rb"\x48\x85\xc0\x0f\x84....\x48\x85\xc0\x90\x0f\x85....\xe8....\x48\x89\x84\x24\x80\x00\x00\x00",
     b"\x48\x85\xc0\x90",
     offset=9,
     desc="eligibility screen off (x64)",
@@ -99,7 +100,7 @@ CLI_GATE_X64 = Gate(
 # arm64:
 #   cbnz x1,error ; cbz x0,eligible ; ldrb w1,[x0,#8] ; tbnz w1,#0,eligible
 #   bl failure_builder
-# Loading 1 instead makes tbnz always select eligible.
+# Загрузка 1 заставляет существующий tbnz всегда выбирать ветку eligible.
 # Хвост (bl + stores) варьируется — в паттерн не включается.
 CLI_GATE_ARM64 = Gate(
     rb"...\xb5...\xb4\x01\x20\x40\x39...\x37",
