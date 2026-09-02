@@ -28,6 +28,7 @@ from patcher.utils.file import (
 )
 from patcher.utils.update import handle_patch_failure
 from patcher.utils.admin import terminate_processes
+from patcher.utils.atomic import atomic_replace_posix, apply_patches_to_data
 
 BAK_EXT = ".agybak"
 
@@ -145,6 +146,19 @@ def _mapped(path):
 
 
 def is_locked(path):
+    """
+    True, если файл занят (приложение запущено).
+
+    На POSIX замена файла через os.replace возможна даже при работающем процессе,
+    поэтому блокирующим считаем только Windows.
+
+    Примечание: на POSIX это не гарантирует, что файл не используется.
+    Если нужна проверка на занятость, требуется более сложная логика
+    (например, проверка процессов или файловые блокировки).
+    """
+    if os.name != "nt":
+        return False
+
     try:
         with open(path, "r+b"):
             return False
@@ -250,11 +264,29 @@ def do_patch_manager(path):
         _make_backup(path)
 
         try:
-            with open(path, "r+b") as f:
-                f.seek(off)
-                f.write(matched_gate.fix)
-                f.flush()
-                os.fsync(f.fileno())
+            if os.name == "nt":
+                # Windows: прямая запись с проверкой блокировки
+                with open(path, "r+b") as f:
+                    bdata = bytearray(f.read())
+
+                    # Валидация (offset, границы, размер) и применение патча
+                    bdata = apply_patches_to_data(bdata, [(off, matched_gate)])
+
+                    f.seek(0)
+                    f.write(bdata)
+                    f.flush()
+                    os.fsync(f.fileno())
+            else:
+                # POSIX: атомарная замена через временный файл
+                with open(path, "rb") as f:
+                    bdata = bytearray(f.read())
+
+                # Валидация (offset, границы, размер) и применение патча
+                bdata = apply_patches_to_data(bdata, [(off, matched_gate)])
+
+                # Атомарная замена с безопасным временным файлом
+                atomic_replace_posix(path, bytes(bdata))
+
             write_success = True
             break
         except PermissionError as e:
@@ -323,7 +355,16 @@ def do_restore_manager(path):
 
     hash_before = file_hash(path)
     try:
-        shutil.copy2(bak, path)
+        if os.name == "nt":
+            shutil.copy2(bak, path)
+        else:
+            # Читаем бэкап в память
+            with open(bak, "rb") as f:
+                bak_data = f.read()
+
+            # Атомарная замена с метаданными из бэкапа
+            atomic_replace_posix(path, bak_data, meta_source=bak)
+
         fix_posix_permissions(path)
     except Exception as e:
         err(f"Restore error: {e}")
