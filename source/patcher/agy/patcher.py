@@ -136,7 +136,10 @@ def _mapped(path):
 
 
 def is_locked(path):
-    """True, если файл занят (приложение запущено)."""
+    """True, если файл занят (приложение запущено). На POSIX замена файла через os.replace
+    возможна даже при работающем процессе, поэтому блокирующим считаем только Windows."""
+    if os.name != "nt":
+        return False
     try:
         with open(path, "r+b"):
             return False
@@ -275,12 +278,27 @@ def do_patch_agy(path):
         _make_backup(path)
 
         try:
-            with open(path, "r+b") as f:
+            if os.name == "nt":
+                with open(path, "r+b") as f:
+                    for off, g in patches:
+                        f.seek(off)
+                        f.write(g.fix)
+                    f.flush()
+                    os.fsync(f.fileno())
+            else:
+                with open(path, "rb") as f:
+                    bdata = bytearray(f.read())
                 for off, g in patches:
-                    f.seek(off)
-                    f.write(g.fix)
-                f.flush()
-                os.fsync(f.fileno())
+                    bdata[off:off+len(g.fix)] = g.fix
+                tmp_path = path + ".tmp"
+                with open(tmp_path, "wb") as f:
+                    f.write(bdata)
+                    f.flush()
+                    os.fsync(f.fileno())
+                shutil.copymode(path, tmp_path)
+                fix_posix_permissions(tmp_path)
+                os.replace(tmp_path, path)
+                fix_posix_permissions(path)
             write_success = True
             break
         except PermissionError as e:
@@ -352,7 +370,14 @@ def do_restore_agy(path):
 
     hash_before = file_hash(path)
     try:
-        shutil.copy2(bak, path)
+        if os.name == "nt":
+            shutil.copy2(bak, path)
+        else:
+            tmp_path = path + ".tmp"
+            shutil.copy2(bak, tmp_path)
+            shutil.copymode(bak, tmp_path)
+            fix_posix_permissions(tmp_path)
+            os.replace(tmp_path, path)
         fix_posix_permissions(path)
     except Exception as e:
         err(f"Restore error: {e}")
