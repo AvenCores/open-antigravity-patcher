@@ -26,6 +26,7 @@ from patcher.utils.file import (
 )
 from patcher.utils.update import handle_patch_failure
 from patcher.utils.admin import terminate_processes
+from patcher.utils.atomic import atomic_replace_posix, apply_patches_to_data
 
 BAK_EXT = ".agybak"
 
@@ -136,10 +137,19 @@ def _mapped(path):
 
 
 def is_locked(path):
-    """True, если файл занят (приложение запущено). На POSIX замена файла через os.replace
-    возможна даже при работающем процессе, поэтому блокирующим считаем только Windows."""
+    """
+    True, если файл занят (приложение запущено).
+
+    На POSIX замена файла через os.replace возможна даже при работающем процессе,
+    поэтому блокирующим считаем только Windows.
+
+    Примечание: на POSIX это не гарантирует, что файл не используется.
+    Если нужна проверка на занятость, требуется более сложная логика
+    (например, проверка процессов или файловые блокировки).
+    """
     if os.name != "nt":
         return False
+
     try:
         with open(path, "r+b"):
             return False
@@ -279,26 +289,24 @@ def do_patch_agy(path):
 
         try:
             if os.name == "nt":
+                # Windows: прямая запись с проверкой блокировки
                 with open(path, "r+b") as f:
-                    for off, g in patches:
-                        f.seek(off)
-                        f.write(g.fix)
-                    f.flush()
-                    os.fsync(f.fileno())
-            else:
-                with open(path, "rb") as f:
                     bdata = bytearray(f.read())
-                for off, g in patches:
-                    bdata[off:off+len(g.fix)] = g.fix
-                tmp_path = path + ".tmp"
-                with open(tmp_path, "wb") as f:
+                    bdata = apply_patches_to_data(bdata, patches)
+                    f.seek(0)
                     f.write(bdata)
                     f.flush()
                     os.fsync(f.fileno())
-                shutil.copymode(path, tmp_path)
-                fix_posix_permissions(tmp_path)
-                os.replace(tmp_path, path)
-                fix_posix_permissions(path)
+            else:
+                # POSIX: атомарная замена через временный файл
+                with open(path, "rb") as f:
+                    bdata = bytearray(f.read())
+
+                bdata = apply_patches_to_data(bdata, patches)
+
+                # Атомарная замена с безопасным временным файлом
+                atomic_replace_posix(path, bytes(bdata))
+
             write_success = True
             break
         except PermissionError as e:
@@ -373,11 +381,13 @@ def do_restore_agy(path):
         if os.name == "nt":
             shutil.copy2(bak, path)
         else:
-            tmp_path = path + ".tmp"
-            shutil.copy2(bak, tmp_path)
-            shutil.copymode(bak, tmp_path)
-            fix_posix_permissions(tmp_path)
-            os.replace(tmp_path, path)
+            # Читаем бэкап в память
+            with open(bak, "rb") as f:
+                bak_data = f.read()
+
+            # Атомарная замена с метаданными из бэкапа
+            atomic_replace_posix(path, bak_data, meta_source=bak)
+
         fix_posix_permissions(path)
     except Exception as e:
         err(f"Restore error: {e}")
