@@ -36,3 +36,23 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n  [i] Exiting...")
         sys.exit(0)
+    except (PermissionError, OSError) as e:
+        # Страховка от необработанного traceback как на скриншоте
+        # (бэкап language_server.agybak -> Errno 1 Operation not permitted):
+        # вместо "Failed to execute script 'main'" показываем понятную подсказку.
+        print(f"\n  [!] Filesystem error: {e}")
+        import sys as _sys
+
+        if _sys.platform == "darwin":
+            print("  [i] macOS blocked writing inside Antigravity.app.")
+            print("  [i] Close Antigravity and re-run with sudo:")
+            print("        sudo python main.py   (or sudo ./Open_AG_Patcher)")
+            print("  [i] If it still says 'Operation not permitted', check flags:")
+            print("        ls -lO /Applications/Antigravity.app/Contents/resources/bin/language_server")
+        else:
+            print("  [i] No write access — re-run as admin/root and close Antigravity first.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n  [!] Unexpected error: {e}")
+        print("  [i] Please report it: https://github.com/AvenCores/open-antigravity-unlock/issues")
+        sys.exit(1)

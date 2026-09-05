@@ -117,9 +117,11 @@ def find_manager_binary():
         for root in _posix_candidate_roots():
             cands += glob.glob(os.path.join(root, "*ntigravity*", rel))
             cands += glob.glob(os.path.join(root, "*ntigravity*", "*", rel))
-            # macOS .app support
+            # macOS .app support (Resources встречается и как resources —
+            # см. /Applications/Antigravity.app/Contents/resources/bin/language_server)
             if sys.platform == "darwin":
                 cands += glob.glob(os.path.join(root, "*ntigravity*.app", "Contents", "Resources", "bin", "language_server"))
+                cands += glob.glob(os.path.join(root, "*ntigravity*.app", "Contents", "resources", "bin", "language_server"))
             direct = os.path.join(root, rel)
             if os.path.isfile(direct):
                 cands.append(direct)
@@ -147,11 +149,12 @@ def resolve_manager_path(raw_path):
         path1 = os.path.join(resolved, rel)
         if os.path.isfile(path1):
             return path1
-        # macOS app contents
+        # macOS app contents (Resources/resources — разный регистр в сборках)
         if sys.platform == "darwin":
-            path2 = os.path.join(resolved, "Contents", "Resources", "bin", "language_server")
-            if os.path.isfile(path2):
-                return path2
+            for sub in ("Contents/Resources/bin/language_server", "Contents/resources/bin/language_server"):
+                path2 = os.path.join(resolved, sub)
+                if os.path.isfile(path2):
+                    return path2
         # direct bin inside
         path3 = os.path.join(resolved, "language_server" + (".exe" if os.name == "nt" else ""))
         if os.path.isfile(path3):
@@ -200,7 +203,7 @@ def find_asar_relative_to_manager(manager_path):
     for _ in range(4):
         if not parent or parent == os.path.dirname(parent):
             break
-        for sub in ("resources/app.asar", "resources/app1.asar", "app.asar", "app1.asar", "Contents/Resources/app.asar", "Contents/Resources/app1.asar"):
+        for sub in ("resources/app.asar", "resources/app1.asar", "app.asar", "app1.asar", "Contents/Resources/app.asar", "Contents/Resources/app1.asar", "Contents/resources/app.asar", "Contents/resources/app1.asar"):
             p = os.path.join(parent, sub)
             if os.path.exists(p):
                 return p

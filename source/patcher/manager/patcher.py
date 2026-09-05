@@ -1,5 +1,7 @@
 import os
 import re
+import sys
+import errno
 import mmap
 import shutil
 import contextlib
@@ -25,6 +27,7 @@ from patcher.utils.file import (
     fix_posix_permissions,
     resign_macos_bundle,
     resign_macos_binary,
+    ensure_macos_writable,
 )
 from patcher.utils.update import handle_patch_failure
 from patcher.utils.admin import terminate_processes
@@ -192,7 +195,27 @@ def _make_backup(path):
         info(f"Backup is stale (app updated) — refreshing {os.path.basename(path)}{BAK_EXT}")
     else:
         info(f"Creating backup -> {os.path.basename(path)}{BAK_EXT}")
-    shutil.copy2(path, bak)
+    if sys.platform == "darwin":
+        # Файлы внутри .app часто несут uchg-флаг: даже root получает
+        # Errno 1 Operation not permitted при copy2 без предварительного chflags.
+        ensure_macos_writable(path)
+    try:
+        shutil.copy2(path, bak)
+    except (PermissionError, OSError) as e:
+        # EPERM (errno 1) на macOS — почти всегда immutable-флаг/владелец.
+        # Одна повторная попытка после снятия флагов, затем проброс наружу,
+        # где do_patch_manager покажет понятную подсказку вместо traceback.
+        need_retry = (
+            sys.platform == "darwin"
+            and isinstance(e, OSError)
+            and e.errno in (errno.EPERM, errno.EACCES)
+        )
+        if need_retry:
+            warn("Backup blocked by macOS flags, retrying after removing flags...")
+            ensure_macos_writable(path)
+            shutil.copy2(path, bak)
+        else:
+            raise
     fix_posix_permissions(bak)
     ok(f"Backup: {os.path.basename(bak)} ({format_bytes(file_size(bak))})")
 
@@ -261,7 +284,19 @@ def do_patch_manager(path):
             err(f"Read error: {e}")
             return
 
-        _make_backup(path)
+        try:
+            _make_backup(path)
+        except (PermissionError, OSError) as e:
+            err(f"Backup error: {e}")
+            if sys.platform == "darwin":
+                hint("macOS blocked writing inside Antigravity.app (Errno 1 Operation not permitted).")
+                hint("Close Antigravity, then re-run the patcher with sudo:")
+                hint("  sudo python main.py   (or sudo ./Open_AG_Patcher)")
+                hint("If it still fails: ls -lO shows 'uchg' flag -> patcher already tried 'chflags nouchg'.")
+            else:
+                hint("No write access — re-run as admin/root and close Antigravity first.")
+            handle_patch_failure()
+            return
 
         try:
             if os.name == "nt":
@@ -285,12 +320,21 @@ def do_patch_manager(path):
                 bdata = apply_patches_to_data(bdata, [(off, matched_gate)])
 
                 # Атомарная замена с безопасным временным файлом
+                # (на macOS каталог .app может нести uchg — снимаем перед mkstemp)
+                if sys.platform == "darwin":
+                    ensure_macos_writable(path)
                 atomic_replace_posix(path, bytes(bdata))
 
             write_success = True
             break
         except PermissionError as e:
             if attempt == 0:
+                if sys.platform == "darwin":
+                    warn(f"Write blocked by macOS (flags/owner): {e}")
+                    ensure_macos_writable(path)
+                    import time
+                    time.sleep(0.5)
+                    continue
                 warn(f"Permission denied (file locked): {e}")
                 if confirmed("Would you like to automatically close running processes and retry?"):
                     terminate_processes(["Antigravity", "Antigravity IDE", "antigravity", "antigravity-ide", "language_server"])
@@ -298,6 +342,19 @@ def do_patch_manager(path):
                     time.sleep(1.5)
                     continue
             err(f"Write error (Permission denied): {e}")
+            if sys.platform == "darwin":
+                hint("Close Antigravity and re-run with sudo: sudo python main.py")
+            handle_patch_failure()
+            return
+        except OSError as e:
+            # EPERM вне PermissionError (на всякий случай) — та же подсказка про sudo/флаги
+            if e.errno in (errno.EPERM, errno.EACCES) and attempt == 0 and sys.platform == "darwin":
+                warn(f"Write blocked by macOS (flags/owner): {e}")
+                ensure_macos_writable(path)
+                import time
+                time.sleep(0.5)
+                continue
+            err(f"Write error: {e}")
             handle_patch_failure()
             return
         except Exception as e:

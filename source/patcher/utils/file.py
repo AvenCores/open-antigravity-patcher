@@ -113,19 +113,60 @@ def remove_macos_immutable_flags(path):
     """Снимает флаги uchg/schg с файла или директории на macOS.
 
     На macOS файлы внутри .app-бандлов могут иметь флаги immutable,
-    которые блокируют запись даже для root. Вызывать перед попыткой
-    записи в .app-бандл.
+    которые блокируют запись даже для root (Errno 1 Operation not
+    permitted при shutil.copy2 / создании бэкапа внутри бандла).
+    Вызывать перед попыткой записи в .app-бандл.
+
+    Возвращает True, если chflags отработал (или платформа не darwin).
+    """
+    import sys
+    if sys.platform != "darwin":
+        return True
+    ok_flag = False
+    # -R работает и для одиночных файлов, и для директорий.
+    # Пробуем сначала связку nouchg,noschg, затем по отдельности
+    # (noschg без Recovery может не сняться — это нормально).
+    for args in (
+        ["chflags", "-R", "nouchg,noschg", path],
+        ["chflags", "-R", "nouchg", path],
+        ["chflags", "nouchg", path],
+    ):
+        try:
+            res = subprocess.run(
+                args,
+                check=False, capture_output=True, timeout=30,
+            )
+            if res.returncode == 0:
+                ok_flag = True
+                break
+        except FileNotFoundError:
+            break
+        except Exception:
+            continue
+    return ok_flag
+
+
+def ensure_macos_writable(path):
+    """Готовит путь внутри .app-бандла к записи на macOS.
+
+    Снимает immutable-флаги с самого файла и с корня .app-бандла,
+    а также quarantine с бандла. Безопасен на других ОС (no-op).
+    Вызывать ПЕРЕД созданием бэкапа и ПЕРЕД атомарной заменой,
+    т.к. обе операции пишут внутрь бандла.
     """
     import sys
     if sys.platform != "darwin":
         return
     try:
-        subprocess.run(
-            ["chflags", "-R", "nouchg", path],
-            check=False, capture_output=True, timeout=30,
-        )
-    except FileNotFoundError:
+        if os.path.isfile(path) or os.path.isdir(path):
+            remove_macos_immutable_flags(path)
+    except Exception:
         pass
+    try:
+        app_path = find_app_bundle(path)
+        if app_path and os.path.normcase(app_path) != os.path.normcase(path):
+            remove_macos_immutable_flags(app_path)
+            remove_macos_quarantine(app_path)
     except Exception:
         pass
 

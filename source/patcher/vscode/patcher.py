@@ -163,7 +163,13 @@ def do_patch_vscode(extension_js_path):
 
     changed = new_content != content
     if changed:
-        _make_backup(path)
+        try:
+            _make_backup(path)
+        except (PermissionError, OSError) as e:
+            err(f"Backup error: {e}")
+            hint("Close VS Code windows and retry. If installed as root, re-run with sudo.")
+            handle_patch_failure()
+            return False
         try:
             with open(path, "w", encoding="utf-8", newline="") as f:
                 f.write(new_content)
