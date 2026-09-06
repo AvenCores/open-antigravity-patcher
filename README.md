@@ -213,7 +213,7 @@ Trajectory ID: d3ee4302-4213-40f9-9ac5-42e83e38a5ce
 | `1` Antigravity IDE patch | Применить патч к `main.js` для Antigravity IDE (bypass region lock) |
 | `2` Antigravity 2.0 patch | Применить патч к бинарному файлу `language_server` (Antigravity Manager) |
 | `3` Antigravity CLI (agy) patch | Применить патч к бинарю `agy`/`agy.exe` (unlock agy tool) |
-| `4` Antigravity VS Code Patch | Патч `extension.js` расширения `google.google-antigravity` + бинаря `~/.gemini/bin/antigravity` |
+| `4` Antigravity VS Code Patch | Патч `extension.js` расширения `google.google-antigravity` + бинаря `~/.gemini/bin/antigravity` (требует установленный и запатченный Antigravity 2.0) |
 | **RESTORE** | |
 | `5` Antigravity IDE | Восстановить оригинальный `main.js` для Antigravity IDE из бэкапа |
 | `6` Antigravity 2.0 | Восстановить оригинальный `language_server` из бэкапа |
@@ -384,6 +384,8 @@ Antigravity CLI — отдельный Go-бинарь (`agy.exe` на Windows, 
 > **Примечание по платформам:** сигнатуры для x86-64 проверены под Windows и Intel macOS, для ARM64 — под Apple Silicon macOS. Discovery ищет бинарь кроссплатформенно (`PATH`, scoop на Windows, `/usr/local/bin`, `/opt/antigravity/bin`, `~/.local/bin` на POSIX). На Linux бинарь `agy` может быть скомпилирован иначе, и сигнатура может не совпасть — в этом случае патч честно сообщит об этом без модификации файла.
 
 ### Патч для расширения Google Antigravity (VS Code)
+
+> **⚠️ Важно:** для корректного патча VS Code расширения (`PATCH → 4`) нужен установленный и уже запатченный Antigravity 2.0 (`PATCH → 2` — патч `language_server`). Сначала установите Antigravity 2.0, примените к нему патч, и только потом патчите расширение `google.google-antigravity` в VS Code.
 
 Расширение `google.google-antigravity` для VS Code при каждом запуске проверяет версию бэкенд-бинаря и перекачивает его с release-сервера Google. Патчер вносит два изменения в `extension.js` расширения:
 
