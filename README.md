@@ -139,6 +139,144 @@ Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Cont
 }
 ```
 
+## ⚠️ Ошибка HTTP 429 Too Many Requests / RESOURCE_EXHAUSTED
+
+При отправке промпта в Antigravity появляется ошибка исчерпания квоты:
+
+```
+Error: HTTP 429 Too Many Requests
+{
+  "error": {
+    "code": 429,
+    "message": "Resource has been exhausted (e.g. check quota).",
+    "status": "RESOURCE_EXHAUSTED"
+  }
+}
+```
+
+Полный вид с Sherlog:
+```
+Error: HTTP 429 Too Many Requests
+Sherlog:
+TraceID: 0xe83b93ad455d1950
+Headers: {"Alt-Svc":["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],"Content-Length":["139"],"Content-Type":["text/event-stream"],"Date":["Sun, 06 Sep 2026 10:44:19 GMT"],"Server":["ESF"],"Server-Timing":["gfet4t7; dur=502"],"Vary":["Origin","X-Origin","Referer"],"X-Cloudaicompanion-Trace-Id":["e83b93ad455d1950"],"X-Content-Type-Options":["nosniff"],"X-Frame-Options":["SAMEORIGIN"],"X-Xss-Protection":["0"]}
+```
+
+**Решение:** сброс папки данных Antigravity (чистая конфигурация + свежие токены), затем опциональное восстановление диалогов из бэкапа. Ниже — полные гайды для Windows, macOS и Linux.
+
+> **Antigravity vs Antigravity IDE:** папка данных называется `Antigravity` для Antigravity 2.0 и `Antigravity IDE` для Antigravity IDE. В командах ниже подставляйте своё название. Дальше для краткости используется `Antigravity`.
+
+### Windows (полный гайд)
+
+**1.** Полностью закройте Antigravity (трей → `Quit` / `Выход`, проверьте в Диспетчере задач, что нет процессов `Antigravity`).
+
+**2.** Откройте `%appdata%` (`Win+R` → введите `%appdata%` → `Enter`). Видите папку `Antigravity` — переместите её в безопасное место, например на Рабочий стол:
+```powershell
+Move-Item "$env:APPDATA\Antigravity" "$env:USERPROFILE\Desktop\Antigravity-backup"
+```
+
+**3.** Запустите Antigravity, авторизуйтесь, отправьте тестовый промпт для проверки связи. Ошибка 429 должна уйти.
+
+**4.** Если всё ОК — закройте Antigravity.
+
+**5.** *(Опционально, восстановление диалогов)* Нам нужны только чаты:
+- `User\globalStorage` (ваши чаты)
+- `User\workspaceStorage`
+
+Antigravity уже создал новую чистую папку `%appdata%\Antigravity` при запуске из п. 3. Удалите в ней только эти две папки и скопируйте их из бэкапа:
+```powershell
+Remove-Item -Recurse -Force "$env:APPDATA\Antigravity\User\globalStorage"
+Remove-Item -Recurse -Force "$env:APPDATA\Antigravity\User\workspaceStorage"
+
+Copy-Item -Recurse "$env:USERPROFILE\Desktop\Antigravity-backup\User\globalStorage" "$env:APPDATA\Antigravity\User\"
+Copy-Item -Recurse "$env:USERPROFILE\Desktop\Antigravity-backup\User\workspaceStorage" "$env:APPDATA\Antigravity\User\"
+```
+
+> ⚠️ **Не копируйте** файл `settings.json` из бэкапа — иначе вернёте старую проблемную конфигурацию.
+
+**6.** Запустите Antigravity, проверьте диалоги и отправьте промпт. Если всё работает — удалите бэкап:
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\Desktop\Antigravity-backup"
+```
+
+### macOS (полный гайд)
+
+**1.** Полностью закройте Antigravity (`Cmd+Q`, проверьте, что точки под иконкой в Dock нет).
+
+**2.** Переместите папку данных в безопасное место:
+```bash
+mv ~/Library/Application\ Support/Antigravity ~/Desktop/Antigravity-backup
+```
+
+**3.** Запустите Antigravity, авторизуйтесь, отправьте тестовый промпт — ошибка 429 должна уйти.
+
+**4.** Если всё ОК — закройте Antigravity (`Cmd+Q`).
+
+**5.** *(Опционально, восстановление диалогов)* Antigravity уже создал новую чистую папку `~/Library/Application Support/Antigravity` при запуске из п. 3. Удалите в ней только хранилища чатов и скопируйте их из бэкапа:
+```bash
+rm -rf ~/Library/Application\ Support/Antigravity/User/globalStorage
+rm -rf ~/Library/Application\ Support/Antigravity/User/workspaceStorage
+
+cp -a ~/Desktop/Antigravity-backup/User/globalStorage ~/Library/Application\ Support/Antigravity/User/
+cp -a ~/Desktop/Antigravity-backup/User/workspaceStorage ~/Library/Application\ Support/Antigravity/User/
+```
+
+> ⚠️ **Не копируйте** файл `settings.json` из бэкапа — иначе вернёте старую проблемную конфигурацию.
+
+**6.** Запустите Antigravity, проверьте диалоги и отправьте промпт. Если всё работает — удалите бэкап:
+```bash
+rm -rf ~/Desktop/Antigravity-backup
+```
+
+### Linux (полный гайд)
+
+Папка данных на Linux: `${XDG_CONFIG_HOME:-~/.config}/Antigravity` (обычно `~/.config/Antigravity`).
+
+**1.** Полностью закройте Antigravity:
+```bash
+pkill -f -i antigravity; sleep 2; pgrep -a -i antigravity || echo "closed"
+```
+
+**2.** Переместите папку данных в безопасное место:
+```bash
+# стандартный путь
+mv ~/.config/Antigravity ~/Antigravity-backup
+
+# если задан XDG_CONFIG_HOME:
+# mv "${XDG_CONFIG_HOME:-$HOME/.config}/Antigravity" ~/Antigravity-backup
+ls -d ~/Antigravity-backup
+```
+
+**3.** Запустите Antigravity, авторизуйтесь, отправьте тестовый промпт — ошибка 429 должна уйти.
+
+**4.** Если всё ОК — закройте Antigravity (п. 1).
+
+**5.** *(Опционально, восстановление диалогов)* Antigravity уже создал новую чистую папку `~/.config/Antigravity` при запуске из п. 3. Удалите в ней только хранилища чатов и скопируйте их из бэкапа:
+```bash
+rm -rf ~/.config/Antigravity/User/globalStorage
+rm -rf ~/.config/Antigravity/User/workspaceStorage
+
+cp -a ~/Antigravity-backup/User/globalStorage ~/.config/Antigravity/User/
+cp -a ~/Antigravity-backup/User/workspaceStorage ~/.config/Antigravity/User/
+```
+
+> ⚠️ **Не копируйте** файл `settings.json` из бэкапа — иначе вернёте старую проблемную конфигурацию.
+
+**6.** Запустите Antigravity, проверьте диалоги и отправьте промпт. Если всё работает — удалите бэкап:
+```bash
+rm -rf ~/Antigravity-backup
+```
+
+### Почему это работает
+
+При перемещении папки данных Antigravity создаёт новую конфигурацию с нуля — свежие токены, чистая квота. Старая привязка к исчерпанной квоте сбрасывается.
+
+### Примечание для пользователей с применённым патчем
+
+Патч модифицирует `main.js` внутри установленного приложения (на macOS — внутри `.app`-бандла) — он **не затрагивается** при перемещении папки данных, поэтому повторный патч не требуется.
+
+Единственное, что сбрасывается — runtime workaround в `settings.json`. Если после сброса данных появятся проблемы — запустите патчер ещё раз (пункт 1 в меню). Патчер обнаружит, что `main.js` уже пропатчен, и применит только settings workaround.
+
 ## ⚠️ Ошибка лицензии Antigravity CLI (#3501)
 Если в Antigravity CLI (`agy`) появляется ошибка `You do not have a valid license of this product`, это не проблема локального патча и не экран `Eligibility Check`.
 
